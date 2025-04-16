@@ -1,0 +1,35 @@
+name: Generar preguntas desde PDF
+
+on:
+  workflow_dispatch:
+    inputs:
+      nombre_topico:
+        description: "Nombre del tema (debe coincidir con el nombre del PDF en docs/)"
+        required: true
+
+jobs:
+  generar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v3
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generar preguntas con LLM
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          python llm_utils.py "${{ github.event.inputs.nombre_topico }}"
+
+      - name: Commit y push de preguntas.json
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "actions@github.com"
+          git add preguntas.json
+          git commit -m "📚 Preguntas generadas para ${{ github.event.inputs.nombre_topico }}"
+          git push
