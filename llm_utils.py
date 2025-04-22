@@ -2,6 +2,7 @@ import os
 import json
 import fitz  # PyMuPDF
 import requests
+from google.cloud import storage
 
 # Clave de API desde secrets de Replit
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -15,6 +16,20 @@ def extract_text_from_pdf(pdf_path):
         text += page.get_text()
     return text
 
+
+def subir_a_gcs(nombre_archivo_local, nombre_bucket, nombre_destino):
+    client = storage.Client()
+    bucket = client.bucket(nombre_bucket)
+    blob = bucket.blob(nombre_destino)
+    blob.upload_from_filename(nombre_archivo_local)
+    print(f"✅ {nombre_archivo_local} subido a gs://{nombre_bucket}/{nombre_destino}")
+
+def descargar_de_gcs(nombre_remoto, nombre_bucket, nombre_local):
+    client = storage.Client()
+    bucket = client.bucket(nombre_bucket)
+    blob = bucket.blob(nombre_remoto)
+    blob.download_to_filename(nombre_local)
+    print(f"✅ {nombre_remoto} descargado de gs://{nombre_bucket} a {nombre_local}")
 
 def generar_prompt(texto, topico):
     return f"""
