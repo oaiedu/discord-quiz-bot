@@ -10,4 +10,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy bot code
 COPY . .
 
-CMD ["python", "Upload Generate Questions.py"]
+CMD ["python", "bot.py"]
