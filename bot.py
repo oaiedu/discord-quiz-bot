@@ -84,8 +84,6 @@ async def estadisticas(interaction: discord.Interaction):
     await interaction.response.send_message(resumen)
 
 
-@bot.tree.command(name="upload",
-                  description="Sube un PDF y genera preguntas automáticamente")
 @bot.tree.command(name="upload", description="Sube un PDF y genera preguntas automáticamente")
 @app_commands.describe(
     nombre_topico="Nombre del tema para guardar el PDF",
