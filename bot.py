@@ -86,30 +86,29 @@ async def estadisticas(interaction: discord.Interaction):
 
 @bot.tree.command(name="upload",
                   description="Sube un PDF y genera preguntas automáticamente")
+@bot.tree.command(name="upload", description="Sube un PDF y genera preguntas automáticamente")
 @app_commands.describe(
-    nombre_topico="Nombre del tema para guardar el PDF y generar preguntas")
-async def upload(interaction: discord.Interaction, nombre_topico: str):
-    if not interaction.attachments:
-        await interaction.response.send_message(
-            "❌ Por favor, adjunta un archivo PDF.")
-        return
-    archivo = interaction.attachments[0]
+    nombre_topico="Nombre del tema para guardar el PDF",
+    archivo="Archivo PDF con el contenido"
+)
+async def upload(interaction: discord.Interaction, nombre_topico: str, archivo: discord.Attachment):
+    await interaction.response.defer(thinking=True)
+
     if not archivo.filename.endswith(".pdf"):
-        await interaction.response.send_message(
-            "❌ Solo se permiten archivos PDF.")
+        await interaction.followup.send("❌ Solo se permiten archivos PDF.")
         return
-    await interaction.response.send_message(
-        f"📥 Recibiendo el archivo para el tema: **{nombre_topico}**...")
+
     os.makedirs(RUTA_DOCS, exist_ok=True)
     ruta_pdf = os.path.join(RUTA_DOCS, f"{nombre_topico}.pdf")
     await archivo.save(ruta_pdf)
+
     try:
         generar_preguntas_desde_pdf(nombre_topico)
         subir_a_gcs("preguntas.json", os.getenv("GCS_BUCKET_NAME"), "preguntas.json")
-        await interaction.followup.send(
-            "🧠 Preguntas generadas correctamente desde el PDF.")
+        await interaction.followup.send("🧠 Preguntas generadas correctamente desde el PDF.")
     except Exception as e:
         await interaction.followup.send(f"❌ Error al generar preguntas: {e}")
+
 
 
 @bot.tree.command(name="topics",
