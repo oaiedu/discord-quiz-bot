@@ -27,6 +27,9 @@ def registrar_estadistica(usuario, topico, correctas, total):
     })
     with open(RUTA_ESTADISTICAS, "w", encoding="utf-8") as f:
         json.dump(datos, f, indent=2, ensure_ascii=False)
+    # Subir a GCS
+    subir_a_gcs(RUTA_ESTADISTICAS, os.getenv("GCS_BUCKET_NAME"), RUTA_ESTADISTICAS)
+
 
 
 class QuizBot(discord.Client):
@@ -56,6 +59,13 @@ async def on_ready():
             print("📥 preguntas.json descargado desde GCS.")
         except Exception as e:
             print(f"⚠️ No se pudo descargar preguntas.json: {e}")
+    if not os.path.exists(RUTA_ESTADISTICAS):
+        try:
+            descargar_de_gcs(RUTA_ESTADISTICAS, os.getenv("GCS_BUCKET_NAME"), RUTA_ESTADISTICAS)
+            print("📥 estadisticas.json descargado desde GCS.")
+        except Exception as e:
+            print(f"⚠️ No se pudo descargar estadisticas.json: {e}")
+
 
 
 @bot.tree.command(
@@ -139,8 +149,7 @@ async def obtener_temas_autocompletado(interaction: discord.Interaction, current
 
 
 
-@bot.tree.command(name="quiz",
-                  description="Haz un quiz de 5 preguntas sobre un tema")
+@bot.tree.command(name="quiz", description="Haz un quiz de 5 preguntas sobre un tema")
 @app_commands.describe(nombre_topico="Nombre del tema")
 @app_commands.autocomplete(nombre_topico=obtener_temas_autocompletado)
 async def quiz(interaction: discord.Interaction, nombre_topico: str):
