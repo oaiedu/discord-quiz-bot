@@ -126,9 +126,23 @@ async def topics(interaction: discord.Interaction):
     await interaction.response.send_message(f"📚 Temas disponibles:\n{temas}")
 
 
+async def obtener_temas_autocompletado(interaction: discord.Interaction, current: str):
+    if not os.path.exists("preguntas.json"):
+        return []
+    with open("preguntas.json", "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    return [
+        app_commands.Choice(name=tema, value=tema)
+        for tema in data.keys() if current.lower() in tema.lower()
+    ][:25]  # Discord permite hasta 25 opciones
+
+
+
 @bot.tree.command(name="quiz",
                   description="Haz un quiz de 5 preguntas sobre un tema")
 @app_commands.describe(nombre_topico="Nombre del tema")
+@app_commands.autocomplete(nombre_topico=obtener_temas_autocompletado)
 async def quiz(interaction: discord.Interaction, nombre_topico: str):
     if not os.path.exists("preguntas.json"):
         await interaction.response.send_message(
