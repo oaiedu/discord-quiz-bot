@@ -1,6 +1,7 @@
 import os
 import json
 import discord
+import uuid  # Certifique-se de importar no topo do arquivo
 from discord import app_commands, Interaction
 
 ROL_PROFESOR = "faculty"
@@ -57,10 +58,20 @@ def register(tree: app_commands.CommandTree):
         data = read_questions()
         if topic not in data:
             data[topic] = []
-        data[topic].append({"pregunta": question, "respuesta": answer.upper()})
+
+        nova_pergunta = {
+            "pregunta": question,
+            "respuesta": answer.upper(),
+            "id": str(uuid.uuid4())  # Gera um ID único
+        }
+
+        data[topic].append(nova_pergunta)
         write_questions(data)
 
-        await interaction.response.send_message(f"✅ Question added to `{topic}`.", ephemeral=True)
+        await interaction.response.send_message(
+            f"✅ Question added to `{topic}` with ID: `{nova_pergunta['id']}`.",
+            ephemeral=True
+        )
 
     @tree.command(name="list_questions", description="List questions for a topic (Professors only)")
     @app_commands.describe(topic="Topic name")
@@ -80,7 +91,7 @@ def register(tree: app_commands.CommandTree):
         bloque_actual = f"📚 Questions for `{topic}`:\n"
 
         for i, q in enumerate(preguntas, start=1):
-            linea = f"{i}. {q['pregunta']} (Answer: {q['respuesta']})\n"
+            linea = f"{i}. {q['pregunta']} (Answer: {q['respuesta']}, ID: `{q['id']}`)\n"
             if len(bloque_actual) + len(linea) > 2000:
                 bloques.append(bloque_actual)
                 bloque_actual = ""
@@ -89,24 +100,36 @@ def register(tree: app_commands.CommandTree):
         if bloque_actual:
             bloques.append(bloque_actual)
 
-        # Enviar el primer mensaje como respuesta y los siguientes como followups
+        # Enviar o primeiro bloco como resposta e os demais como follow-ups
         await interaction.response.send_message(bloques[0], ephemeral=True)
         for bloque in bloques[1:]:
             await interaction.followup.send(bloque, ephemeral=True)
 
-    @tree.command(name="delete_question", description="Delete a question by index (Professors only)")
-    @app_commands.describe(topic="Topic name", index="Question number (starts at 1)")
+    @tree.command(name="delete_question", description="Delete a question by ID (Professors only)")
+    @app_commands.describe(topic="Topic name", id="Question ID")
     @app_commands.autocomplete(topic=obtener_temas_autocompletado)
-    async def delete_question(interaction: Interaction, topic: str, index: int):
+    async def delete_question(interaction: Interaction, topic: str, id: str):
         if not is_professor(interaction):
             await interaction.response.send_message("⛔ This command is for professors only.", ephemeral=True)
             return
 
-        data = read_questions()
-        if topic not in data or index < 1 or index > len(data[topic]):
-            await interaction.response.send_message("❌ Invalid topic or index.", ephemeral=True)
+        try:
+            UUID(id)  # valida formato UUID
+        except ValueError:
+            await interaction.response.send_message("❌ Invalid question ID format.", ephemeral=True)
             return
 
-        deleted = data[topic].pop(index - 1)
-        write_questions(data)
-        await interaction.response.send_message(f"🗑️ Deleted question: `{deleted['pregunta']}`", ephemeral=True)
+        data = read_questions()
+        if topic not in data:
+            await interaction.response.send_message("❌ Topic not found.", ephemeral=True)
+            return
+
+        preguntas = data[topic]
+        for i, q in enumerate(preguntas):
+            if q.get("id") == id:
+                deleted = preguntas.pop(i)
+                write_questions(data)
+                await interaction.response.send_message(f"🗑️ Deleted question: `{deleted['pregunta']}`", ephemeral=True)
+                return
+
+        await interaction.response.send_message(f"❌ No question with ID `{id}` found in `{topic}`.", ephemeral=True)
