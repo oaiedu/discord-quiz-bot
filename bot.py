@@ -52,6 +52,10 @@ class QuizBot(discord.Client):
 
 bot = QuizBot()
 
+from commands import crud_questions
+crud_questions.register(bot.tree)
+
+
 
 @bot.event
 async def on_ready():
@@ -209,10 +213,13 @@ async def quiz(interaction: discord.Interaction, nombre_topico: str):
     registrar_estadistica(interaction.user, nombre_topico, correctas, len(preguntas))
 
 
+
+
+
 @bot.tree.command(name="help",
                   description="Explica cómo usar el bot y sus comandos disponibles")
 async def help_command(interaction: discord.Interaction):
-    await interaction.response.defer(thinking=True, ephemeral=True)  # 👈 evita l'expiració
+    await interaction.response.defer(thinking=True, ephemeral=True)  # Evita expiració
 
     es_profe = False
     if interaction.guild:
@@ -225,10 +232,14 @@ async def help_command(interaction: discord.Interaction):
             "👉 `/quiz <tema>` — Lanza un quiz de 5 preguntas de verdadero o falso.\n"
             "👉 `/topics` — Lista los temas disponibles para practicar.\n"
             "👉 `/upload <tema>` — Sube un PDF para generar nuevas preguntas.\n"
-            "👉 `/stats` — Consulta los resultados de todos los estudiantes.\n\n"
+            "👉 `/stats` — Consulta los resultados de todos los estudiantes.\n"
+            "👉 `/add_question` — Añade manualmente una pregunta a un tema.\n"
+            "👉 `/list_questions` — Lista las preguntas existentes de un tema.\n"
+            "👉 `/delete_question` — Elimina una pregunta de un tema mediante su número.\n\n"
             "💬 Para responder un quiz, contesta con una secuencia como `VFVFV`.\n"
             "⏱️ Tienes 60 segundos para responder cada quiz.\n"
-            "🧠 ¡Buena práctica!")
+            "🧠 ¡Buena práctica!"
+        )
     else:
         mensaje = (
             "📘 **Guía para estudiantes**\n\n"
@@ -236,10 +247,10 @@ async def help_command(interaction: discord.Interaction):
             "👉 `/topics` — Lista los temas disponibles para practicar.\n\n"
             "💬 Para responder un quiz, contesta con una secuencia como `VFVFV`.\n"
             "⏱️ Tienes 60 segundos para responder cada quiz.\n"
-            "🧠 ¡Buena práctica!")
+            "🧠 ¡Buena práctica!"
+        )
 
     await interaction.followup.send(mensaje, ephemeral=True)
-
 
 from keep_alive import keep_alive
 
