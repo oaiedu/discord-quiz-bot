@@ -2,6 +2,7 @@ import os
 import json
 import discord
 from discord import app_commands, Interaction
+from views.pagination_view import PaginationView
 
 ROL_PROFESOR = "faculty"
 PREGUNTAS_JSON = "preguntas.json"
@@ -72,6 +73,7 @@ def register(tree: app_commands.CommandTree):
             ephemeral=True
         )
 
+    # Comando principal com paginação
     @tree.command(name="list_questions", description="List questions for a topic (Professors only)")
     @app_commands.describe(topic="Topic name")
     @app_commands.autocomplete(topic=obtener_temas_autocompletado)
@@ -86,22 +88,8 @@ def register(tree: app_commands.CommandTree):
             return
 
         preguntas = data[topic]
-        bloques = []
-        bloque_actual = f"📚 Questions for `{topic}`:\n"
-
-        for i, q in enumerate(preguntas, start=1):
-            linea = f"{i}. {q['pregunta']} (Answer: {q['respuesta']}, ID: `{q['id']}`)\n"
-            if len(bloque_actual) + len(linea) > 2000:
-                bloques.append(bloque_actual)
-                bloque_actual = ""
-            bloque_actual += linea
-
-        if bloque_actual:
-            bloques.append(bloque_actual)
-
-        await interaction.response.send_message(bloques[0], ephemeral=True)
-        for bloque in bloques[1:]:
-            await interaction.followup.send(bloque, ephemeral=True)
+        view = PaginationView(interaction, preguntas, topic)
+        await interaction.response.send_message(content=view.format_page(0), view=view, ephemeral=True)
 
     @tree.command(name="delete_question", description="Delete a question by ID (Professors only)")
     @app_commands.describe(topic="Topic name", id="Question ID (number)")
