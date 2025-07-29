@@ -212,6 +212,8 @@ async def quiz(interaction: discord.Interaction, nombre_topico: str):
 @bot.tree.command(name="help",
                   description="Explica cómo usar el bot y sus comandos disponibles")
 async def help_command(interaction: discord.Interaction):
+    await interaction.response.defer(thinking=True, ephemeral=True)  # 👈 evita l'expiració
+
     es_profe = False
     if interaction.guild:
         member = interaction.user
@@ -236,7 +238,7 @@ async def help_command(interaction: discord.Interaction):
             "⏱️ Tienes 60 segundos para responder cada quiz.\n"
             "🧠 ¡Buena práctica!")
 
-    await interaction.response.send_message(mensaje, ephemeral=True)
+    await interaction.followup.send(mensaje, ephemeral=True)
 
 
 from keep_alive import keep_alive
