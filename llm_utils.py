@@ -2,6 +2,7 @@ import os
 import json
 import fitz  # PyMuPDF
 import requests
+import uuid  # Adicione esta importação ao topo do arquivo
 from google.cloud import storage
 
 # Clave de API desde secrets de Replit
@@ -74,12 +75,13 @@ def guardar_preguntas_json(topico, preguntas_str):
     try:
         preguntas = json.loads(preguntas_str)
     except json.JSONDecodeError:
-        print(
-            "⚠️ Error al parsear JSON generado. Verifica el output del modelo."
-        )
+        print("⚠️ Error al parsear JSON generado. Verifica el output del modelo.")
         return
 
-    # Cargar preguntas existentes
+    for pregunta in preguntas:
+        pregunta["id"] = str(uuid.uuid4())
+
+    # Carregar perguntas existentes
     if os.path.exists("preguntas.json"):
         with open("preguntas.json", "r", encoding="utf-8") as f:
             data = json.load(f)
