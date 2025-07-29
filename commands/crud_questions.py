@@ -1,7 +1,6 @@
 import os
 import json
 from discord import app_commands, Interaction
-from bot import bot
 import discord
 
 ROL_PROFESOR = "faculty"

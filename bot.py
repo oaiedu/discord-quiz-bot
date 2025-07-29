@@ -7,6 +7,7 @@ import random
 from discord import app_commands
 from llm_utils import generar_preguntas_desde_pdf, subir_a_gcs, descargar_de_gcs
 import logging
+from commands import crud_questions
 
 logging.basicConfig(level=logging.INFO)
 
@@ -52,8 +53,8 @@ class QuizBot(discord.Client):
 
 bot = QuizBot()
 
-from commands import crud_questions
 crud_questions.register(bot.tree)
+
 
 
 
