@@ -6,6 +6,9 @@ import json
 import random
 from discord import app_commands
 from llm_utils import generar_preguntas_desde_pdf, subir_a_gcs, descargar_de_gcs
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 RUTA_DOCS = "docs"
 RUTA_ESTADISTICAS = "estadisticas.json"
@@ -122,19 +125,32 @@ async def upload(interaction: discord.Interaction, nombre_topico: str, archivo: 
 @bot.tree.command(name="topics",
                   description="Muestra los temas disponibles para hacer quizzes")
 async def topics(interaction: discord.Interaction):
+    logging.info("Slash command /topics triggered by user: %s", interaction.user)
+
     if not os.path.exists("preguntas.json"):
+        logging.warning("Archivo 'preguntas.json' no encontrado.")
         await interaction.response.send_message(
             "❌ No se encontró el archivo `preguntas.json`.")
         return
-    with open("preguntas.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
+
+    try:
+        with open("preguntas.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        logging.error("Error al cargar JSON: %s", e)
+        await interaction.response.send_message(
+            "❌ Error al leer el archivo de preguntas.")
+        return
+
     if not data:
+        logging.info("El archivo 'preguntas.json' está vacío.")
         await interaction.response.send_message(
             "❌ No hay temas disponibles todavía.")
         return
-    temas = "\n".join(f"- {t}" for t in data.keys())
-    await interaction.response.send_message(f"📚 Temas disponibles:\n{temas}")
 
+    temas = "\n".join(f"- {t}" for t in data.keys())
+    logging.info("Temas encontrados: %s", temas.replace("\n", ", "))
+    await interaction.response.send_message(f"📚 Temas disponibles:\n{temas}")
 
 async def obtener_temas_autocompletado(interaction: discord.Interaction, current: str):
     if not os.path.exists("preguntas.json"):
