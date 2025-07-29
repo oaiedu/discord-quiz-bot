@@ -1,12 +1,10 @@
 import os
 import json
 import discord
-import uuid  # Certifique-se de importar no topo do arquivo
 from discord import app_commands, Interaction
 
 ROL_PROFESOR = "faculty"
 PREGUNTAS_JSON = "preguntas.json"
-
 
 # Funciones auxiliares
 def read_questions():
@@ -15,11 +13,9 @@ def read_questions():
     with open(PREGUNTAS_JSON, "r", encoding="utf-8") as f:
         return json.load(f)
 
-
 def write_questions(data):
     with open(PREGUNTAS_JSON, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-
 
 def is_professor(interaction: Interaction) -> bool:
     return interaction.guild and any(
@@ -27,14 +23,12 @@ def is_professor(interaction: Interaction) -> bool:
         for role in interaction.user.roles
     )
 
-
 async def obtener_temas_autocompletado(interaction: Interaction, current: str):
     data = read_questions()
     return [
         app_commands.Choice(name=tema, value=tema)
         for tema in data.keys() if current.lower() in tema.lower()
     ][:25]  # Máximo 25 opciones
-
 
 # Registro de comandos
 def register(tree: app_commands.CommandTree):
@@ -59,10 +53,15 @@ def register(tree: app_commands.CommandTree):
         if topic not in data:
             data[topic] = []
 
+        ultimo_id = max(
+            [int(q["id"]) for q in data[topic] if "id" in q and str(q["id"]).isdigit()],
+            default=0
+        )
+
         nova_pergunta = {
             "pregunta": question,
             "respuesta": answer.upper(),
-            "id": str(uuid.uuid4())  # Gera um ID único
+            "id": str(ultimo_id + 1)
         }
 
         data[topic].append(nova_pergunta)
@@ -100,23 +99,20 @@ def register(tree: app_commands.CommandTree):
         if bloque_actual:
             bloques.append(bloque_actual)
 
-        # Enviar o primeiro bloco como resposta e os demais como follow-ups
         await interaction.response.send_message(bloques[0], ephemeral=True)
         for bloque in bloques[1:]:
             await interaction.followup.send(bloque, ephemeral=True)
 
     @tree.command(name="delete_question", description="Delete a question by ID (Professors only)")
-    @app_commands.describe(topic="Topic name", id="Question ID")
+    @app_commands.describe(topic="Topic name", id="Question ID (number)")
     @app_commands.autocomplete(topic=obtener_temas_autocompletado)
     async def delete_question(interaction: Interaction, topic: str, id: str):
         if not is_professor(interaction):
             await interaction.response.send_message("⛔ This command is for professors only.", ephemeral=True)
             return
 
-        try:
-            UUID(id)  # valida formato UUID
-        except ValueError:
-            await interaction.response.send_message("❌ Invalid question ID format.", ephemeral=True)
+        if not id.isdigit():
+            await interaction.response.send_message("❌ Question ID must be a number.", ephemeral=True)
             return
 
         data = read_questions()

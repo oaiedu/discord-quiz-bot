@@ -73,13 +73,10 @@ def enviar_a_openrouter(prompt):
 
 def guardar_preguntas_json(topico, preguntas_str):
     try:
-        preguntas = json.loads(preguntas_str)
+        preguntas_novas = json.loads(preguntas_str)
     except json.JSONDecodeError:
         print("⚠️ Error al parsear JSON generado. Verifica el output del modelo.")
         return
-
-    for pregunta in preguntas:
-        pregunta["id"] = str(uuid.uuid4())
 
     # Carregar perguntas existentes
     if os.path.exists("preguntas.json"):
@@ -88,7 +85,21 @@ def guardar_preguntas_json(topico, preguntas_str):
     else:
         data = {}
 
-    data[topico] = preguntas
+    if topico not in data:
+        data[topico] = []
+
+    # Determinar o próximo ID incremental
+    perguntas_existentes = data[topico]
+    ultimo_id = max(
+        [int(q["id"]) for q in perguntas_existentes if "id" in q and str(q["id"]).isdigit()],
+        default=0
+    )
+
+    for i, pregunta in enumerate(preguntas_novas, start=1):
+        pregunta["id"] = str(ultimo_id + i)
+
+    # Atualizar os dados com as novas perguntas
+    data[topico].extend(preguntas_novas)
 
     with open("preguntas.json", "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
