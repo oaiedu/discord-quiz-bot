@@ -2,6 +2,7 @@ import os
 import json
 import fitz  # PyMuPDF
 import requests
+import uuid  # Adicione esta importação ao topo do arquivo
 from google.cloud import storage
 
 # Clave de API desde secrets de Replit
@@ -72,21 +73,33 @@ def enviar_a_openrouter(prompt):
 
 def guardar_preguntas_json(topico, preguntas_str):
     try:
-        preguntas = json.loads(preguntas_str)
+        preguntas_novas = json.loads(preguntas_str)
     except json.JSONDecodeError:
-        print(
-            "⚠️ Error al parsear JSON generado. Verifica el output del modelo."
-        )
+        print("⚠️ Error al parsear JSON generado. Verifica el output del modelo.")
         return
 
-    # Cargar preguntas existentes
+    # Carregar perguntas existentes
     if os.path.exists("preguntas.json"):
         with open("preguntas.json", "r", encoding="utf-8") as f:
             data = json.load(f)
     else:
         data = {}
 
-    data[topico] = preguntas
+    if topico not in data:
+        data[topico] = []
+
+    # Determinar o próximo ID incremental
+    perguntas_existentes = data[topico]
+    ultimo_id = max(
+        [int(q["id"]) for q in perguntas_existentes if "id" in q and str(q["id"]).isdigit()],
+        default=0
+    )
+
+    for i, pregunta in enumerate(preguntas_novas, start=1):
+        pregunta["id"] = str(ultimo_id + i)
+
+    # Atualizar os dados com as novas perguntas
+    data[topico].extend(preguntas_novas)
 
     with open("preguntas.json", "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)

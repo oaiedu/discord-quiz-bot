@@ -214,9 +214,6 @@ async def quiz(interaction: discord.Interaction, nombre_topico: str):
     registrar_estadistica(interaction.user, nombre_topico, correctas, len(preguntas))
 
 
-
-
-
 @bot.tree.command(name="help",
                   description="Explica cómo usar el bot y sus comandos disponibles")
 async def help_command(interaction: discord.Interaction):
@@ -252,6 +249,23 @@ async def help_command(interaction: discord.Interaction):
         )
 
     await interaction.followup.send(mensaje, ephemeral=True)
+
+@bot.event
+async def on_guild_join(guild: discord.Guild):
+    logging.info(f"🆕 Bot adicionado ao servidor: {guild.name} (ID: {guild.id})")
+
+    # Tenta encontrar um canal de texto para enviar uma mensagem de boas-vindas
+    canal = discord.utils.find(
+        lambda c: c.permissions_for(guild.me).send_messages and isinstance(c, discord.TextChannel),
+        guild.text_channels
+    )
+
+    if canal:
+        await canal.send(
+            "👋 ¡Hola! Gracias por añadirme a este servidor.\n"
+            "Usa `/help` para ver cómo puedo ayudarte con quizzes de verdadero o falso. 🎓"
+        )
+
 
 from keep_alive import keep_alive
 
