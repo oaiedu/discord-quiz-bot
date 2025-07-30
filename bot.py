@@ -155,7 +155,7 @@ async def topics(interaction: discord.Interaction):
 
     temas = "\n".join(f"- {t}" for t in data.keys())
     logging.info("Temas encontrados: %s", temas.replace("\n", ", "))
-    await interaction.response.send_message(f"📚 Temas disponibles:\n{temas}")
+    await interaction.response.send_message(f"📚 Temas disponibles(teste pagination):\n{temas}")
 
 async def obtener_temas_autocompletado(interaction: discord.Interaction, current: str):
     if not os.path.exists("preguntas.json"):
