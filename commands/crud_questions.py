@@ -2,7 +2,7 @@ import os
 import json
 import discord
 from discord import app_commands, Interaction
-from views.pagination_view import PaginationView
+from views.pagination import PaginationView
 
 ROL_PROFESOR = "faculty"
 PREGUNTAS_JSON = "preguntas.json"
@@ -88,8 +88,11 @@ def register(tree: app_commands.CommandTree):
             return
 
         preguntas = data[topic]
-        view = PaginationView(interaction, preguntas, topic)
-        await interaction.response.send_message(content=view.format_page(0), view=view, ephemeral=True)
+        pagination_view = PaginationView()
+        pagination_view.data = preguntas
+        await pagination_view.send_message(content=pagination_view.format_page(0), view=pagination_view, ephemeral=True)
+
+        # await interaction.response.send_message(content=view.format_page(0), view=view, ephemeral=True)
 
     @tree.command(name="delete_question", description="Delete a question by ID (Professors only)")
     @app_commands.describe(topic="Topic name", id="Question ID (number)")
