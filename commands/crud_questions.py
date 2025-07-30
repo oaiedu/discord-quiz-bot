@@ -80,34 +80,20 @@ def register(tree: app_commands.CommandTree):
         if not is_professor(interaction):
             await interaction.response.send_message("⛔ This command is for professors only.", ephemeral=True)
             return
-        
-        data = read_questions()
-        if topic not in data or not data[topic]:
-            await interaction.response.send_message(f"📭 No questions found for `{topic}`.", ephemeral=True)
-            return
-        
-        preguntas = data[topic]
-        bloques = []
-        bloque_actual = f"📚 Questions for `{topic}`:\n"
 
-        for i, q in enumerate(preguntas, start=1):
-            linea = f"{i}. {q['pregunta']} (Answer: {q['respuesta']})\n"
-            if len(bloque_actual) + len(linea) > 2000:
-                bloques.append(bloque_actual)
-                bloque_actual = ""
-            bloque_actual += linea
+        try:
+            data = read_questions()
+            if topic not in data or not data[topic]:
+                await interaction.response.send_message(f"📭 No questions found for `{topic}`.", ephemeral=True)
+                return
 
-        if bloque_actual:
-            bloques.append(bloque_actual)
+            pagination_view = PaginationView(data[topic], ephemeral=True)
+            pagination_view.message = interaction
+            await pagination_view.send_message(content=None, view=pagination_view, ephemeral=True)
 
-        # Enviar el primer mensaje como respuesta y los siguientes como followups
-        await interaction.response.send_message(bloques[0], ephemeral=True)
-        for bloque in bloques[1:]:
-            await interaction.followup.send(bloque, ephemeral=True)
-        
-        # view = PaginationView()
-        # view.data = data[topic]
-        # await interaction.response.send_message(embed=view.create_embed(view.data[:view.sep]), view=view)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ An error occurred: {str(e)}", ephemeral=True)
+
 
     @tree.command(name="delete_question", description="Delete a question by ID (Professors only)")
     @app_commands.describe(topic="Topic name", id="Question ID (number)")
