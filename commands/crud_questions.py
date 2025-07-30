@@ -88,14 +88,16 @@ def register(tree: app_commands.CommandTree):
                 await interaction.response.send_message(f"📭 No questions found for `{topic}`.", ephemeral=True)
                 return
 
-            await interaction.response.send_message("teste1", ephemeral=True)
             pagination_view = PaginationView(data[topic], timeout=None)
-            await interaction.response.send_message("teste2", ephemeral=True)
             await pagination_view.send_interaction(interaction)
-            await interaction.response.send_message("teste3", ephemeral=True)
 
         except Exception as e:
-            await interaction.response.send_message(f"❌ An error occurred: {str(e)}", ephemeral=True)
+            # Você já respondeu? Use followup!
+            try:
+                await interaction.followup.send(f"❌ An error occurred: {str(e)}", ephemeral=True)
+            except:
+                await interaction.response.send_message(f"❌ An error occurred: {str(e)}", ephemeral=True)
+
 
 
     @tree.command(name="delete_question", description="Delete a question by ID (Professors only)")
