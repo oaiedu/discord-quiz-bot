@@ -7,8 +7,12 @@ import utils
 logger = settings.logging.getLogger("bot")
 
 class PaginationView(discord.ui.View):
-    current_page : int = 1
-    sep : int = 5
+    def __init__(self, data: list, timeout=180):
+        super().__init__(timeout=timeout)
+        self.current_page = 1
+        self.sep = 5
+        self.data = data
+        self.message = None  # será preenchido após o envio
 
     async def send(self, ctx):
         self.message = await ctx.send(view=self)
@@ -30,6 +34,12 @@ class PaginationView(discord.ui.View):
             )
 
         return embed
+    
+    async def send_interaction(self, interaction: discord.Interaction):
+        embed = self.create_embed(self.get_current_page_data())
+        await interaction.response.send_message(embed=embed, view=self, ephemeral=True)
+        self.message = await interaction.original_response()
+    
 
     async def update_message(self,data):
         self.update_buttons()
