@@ -1,66 +1,67 @@
 import discord
-from discord.ext import commands
-import utils
 
 class PaginationView(discord.ui.View):
-    current_page : int = 1
-    sep : int = 1
-    async def send(self, ctx):
-        self.message = await ctx.send(view=self)
+    def __init__(self, data, ephemeral=False, per_page=5):
+        super().__init__()
+        self.data = data
+        self.per_page = per_page
+        self.current_page = 0
+        self.ephemeral = ephemeral
+        self.message = None  # Armazenará a mensagem para poder editá-la
 
-    def create_embed(sel, data):
-        embed = discord.Embed(title="Example")
-        for item in data:
-            embed.add_field(name=item, value=item, inline=False)
+    def format_page(self, page: int):
+        start = page * self.per_page
+        end = start + self.per_page
+        items = self.data[start:end]
+
+        embed = discord.Embed(title="Questions")
+        for item in items:
+            embed.add_field(name=item, value="\u200b", inline=False)
+        embed.set_footer(text=f"Page {page + 1}/{(len(self.data) + self.per_page - 1) // self.per_page}")
         return embed
-    
-    async def update_message(self, data):
-        await self.message.edit(self.create_embed(data), view = self)
 
-    @discord.ui.button(label=">", style=discord.ButtonStyle.primary)
-    async def nextButton(self, interaction:discord.Interactions, button: discord.ui.Button):
-        await interaction.response.defer()
-        self.current_page += 1
-        until_item = self.current_page * self.sep
-        from_item = until_item - self.sep
-        await self.update_message(self.data[from_item:until_item])
+    async def send_message(self, content, view, ephemeral=False):
+        try:
+            self.message = await view.interaction.response.send_message(
+                embed=self.format_page(0),
+                view=self,
+                ephemeral=self.ephemeral
+            )
+        except Exception as e:
+            print(f"❌ Error sending paginated message: {e}")
+
+    async def update_message(self):
+        try:
+            await self.message.edit(embed=self.format_page(self.current_page), view=self)
+        except Exception as e:
+            print(f"❌ Error updating message: {e}")
+
+    def page_bounds(self):
+        total_pages = (len(self.data) + self.per_page - 1) // self.per_page
+        self.current_page = max(0, min(self.current_page, total_pages - 1))
 
     @discord.ui.button(label="<", style=discord.ButtonStyle.primary)
-    async def prevButton(self, interaction:discord.Interactions, button: discord.ui.Button):
+    async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         self.current_page -= 1
-        until_item = self.current_page * self.sep
-        from_item = until_item - self.sep
-        await self.update_message(self.data[from_item:until_item])
+        self.page_bounds()
+        await self.update_message()
 
-    @discord.ui.button(label="!<", style=discord.ButtonStyle.primary)
-    async def firstPageButton(self, interaction:discord.Interactions, button: discord.ui.Button):
+    @discord.ui.button(label=">", style=discord.ButtonStyle.primary)
+    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
-        self.current_page = 1
-        until_item = self.current_page * self.sep
-        from_item = until_item - self.sep
-        await self.update_message(self.data[:until_item])
+        self.current_page += 1
+        self.page_bounds()
+        await self.update_message()
 
-    @discord.ui.button(label=">!", style=discord.ButtonStyle.primary)
-    async def lastPageButton(self, interaction:discord.Interactions, button: discord.ui.Button):
+    @discord.ui.button(label="⏮️", style=discord.ButtonStyle.secondary)
+    async def first(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
-        self.current_page = int(len(self.data) / self.sep) + 1
-        until_item = self.current_page * self.sep
-        from_item = until_item - self.sep
-        await self.update_message(self.data[from_item:])
+        self.current_page = 0
+        await self.update_message()
 
-def run():
-    intents = discord.Intents.all()
-
-    bot = commands.Bot(command_prefix="!", intents=intents)
-
-    @bot.event
-    async def on_ready():
-        await utils.load_videocmds(bot)
-
-        @bot.command()
-        async def paginate(ctx):
-            data = range(1, 15)
-            pagination_view = PaginationView()
-            pagination_view.data = data
-            await pagination_view.send(ctx)
+    @discord.ui.button(label="⏭️", style=discord.ButtonStyle.secondary)
+    async def last(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        self.current_page = (len(self.data) - 1) // self.per_page
+        await self.update_message()
