@@ -73,7 +73,6 @@ def register(tree: app_commands.CommandTree):
             ephemeral=True
         )
 
-    # Comando principal com paginação
     @tree.command(name="list_questions", description="List questions for a topic (Professors only)")
     @app_commands.describe(topic="Topic name")
     @app_commands.autocomplete(topic=obtener_temas_autocompletado)
@@ -81,18 +80,15 @@ def register(tree: app_commands.CommandTree):
         if not is_professor(interaction):
             await interaction.response.send_message("⛔ This command is for professors only.", ephemeral=True)
             return
-
+        
         data = read_questions()
         if topic not in data or not data[topic]:
             await interaction.response.send_message(f"📭 No questions found for `{topic}`.", ephemeral=True)
             return
-
-        preguntas = data[topic]
-        pagination_view = PaginationView()
-        pagination_view.data = preguntas
-        await pagination_view.send_message(content=pagination_view.format_page(0), view=pagination_view, ephemeral=True)
-
-        # await interaction.response.send_message(content=view.format_page(0), view=view, ephemeral=True)
+        
+        view = PaginationView()
+        view.data = data[topic]
+        await interaction.response.send_message(embed=view.create_embed(view.data[:view.sep]), view=view)
 
     @tree.command(name="delete_question", description="Delete a question by ID (Professors only)")
     @app_commands.describe(topic="Topic name", id="Question ID (number)")

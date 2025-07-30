@@ -3,8 +3,12 @@ from discord.ext import commands
 import utils
 
 class PaginationView(discord.ui.View):
-    current_page : int = 1
-    sep : int = 1
+    def __init__(self):
+        super().__init__(timeout=180)  # 3 minutos de timeout
+        self.current_page = 1
+        self.sep = 5  # Número de itens por página
+        self.data = []
+        
     async def send(self, ctx):
         self.message = await ctx.send(view=self)
 
