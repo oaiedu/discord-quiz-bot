@@ -1,7 +1,6 @@
 import os
 import json
 import discord
-import traceback
 from discord import app_commands, Interaction
 from views.pagination import PaginationView
 
@@ -74,29 +73,26 @@ def register(tree: app_commands.CommandTree):
             ephemeral=True
         )
 
+    # Comando principal com paginação
     @tree.command(name="list_questions", description="List questions for a topic (Professors only)")
     @app_commands.describe(topic="Topic name")
     @app_commands.autocomplete(topic=obtener_temas_autocompletado)
-    async def list_questions(interaction: discord.Interaction, topic: str):
+    async def list_questions(interaction: Interaction, topic: str):
         if not is_professor(interaction):
             await interaction.response.send_message("⛔ This command is for professors only.", ephemeral=True)
             return
 
-        try:
-            data = read_questions()
-            if topic not in data or not data[topic]:
-                await interaction.response.send_message(f"📭 No questions found for `{topic}`.", ephemeral=True)
-                return
+        data = read_questions()
+        if topic not in data or not data[topic]:
+            await interaction.response.send_message(f"📭 No questions found for `{topic}`.", ephemeral=True)
+            return
 
-            pagination_view = PaginationView(data[topic], sep=5, ephemeral=True)
-            await pagination_view.send(interaction)
+        preguntas = data[topic]
+        pagination_view = PaginationView()
+        pagination_view.data = preguntas
+        await pagination_view.send_message(content=pagination_view.format_page(0), view=pagination_view, ephemeral=True)
 
-        except Exception as e:
-            print("Erro em list_questions:")
-            traceback.print_exc()  # mostra a stack trace completa no console
-            await interaction.followup.send(f"❌ An error occurred: {e}", ephemeral=True)
-
-
+        # await interaction.response.send_message(content=view.format_page(0), view=view, ephemeral=True)
 
     @tree.command(name="delete_question", description="Delete a question by ID (Professors only)")
     @app_commands.describe(topic="Topic name", id="Question ID (number)")
