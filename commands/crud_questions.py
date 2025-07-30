@@ -76,19 +76,24 @@ def register(tree: app_commands.CommandTree):
     @tree.command(name="list_questions", description="List questions for a topic (Professors only)")
     @app_commands.describe(topic="Topic name")
     @app_commands.autocomplete(topic=obtener_temas_autocompletado)
-    async def list_questions(interaction: discord.Interaction, topic: str):
+    async def list_questions(interaction: Interaction, topic: str):
         if not is_professor(interaction):
             await interaction.response.send_message("⛔ This command is for professors only.", ephemeral=True)
             return
 
         try:
+            
             data = read_questions()
             if topic not in data or not data[topic]:
                 await interaction.response.send_message(f"📭 No questions found for `{topic}`.", ephemeral=True)
                 return
+            
+            await interaction.response.send_message("teste passou do No question found", ephemeral=True)
 
             pagination_view = PaginationView(data[topic], ephemeral=True)
+            await interaction.response.send_message("teste passou do getPaginationView", ephemeral=True)
             pagination_view.message = interaction
+            await interaction.response.send_message("teste passou do interection message", ephemeral=True)
             await pagination_view.send_message(content=None, view=pagination_view, ephemeral=True)
 
         except Exception as e:
