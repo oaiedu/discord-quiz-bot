@@ -86,9 +86,28 @@ def register(tree: app_commands.CommandTree):
             await interaction.response.send_message(f"📭 No questions found for `{topic}`.", ephemeral=True)
             return
         
-        view = PaginationView()
-        view.data = data[topic]
-        await interaction.response.send_message(embed=view.create_embed(view.data[:view.sep]), view=view)
+        preguntas = data[topic]
+        bloques = []
+        bloque_actual = f"📚 Questions for `{topic}`:\n"
+
+        for i, q in enumerate(preguntas, start=1):
+            linea = f"{i}. {q['pregunta']} (Answer: {q['respuesta']})\n"
+            if len(bloque_actual) + len(linea) > 2000:
+                bloques.append(bloque_actual)
+                bloque_actual = ""
+            bloque_actual += linea
+
+        if bloque_actual:
+            bloques.append(bloque_actual)
+
+        # Enviar el primer mensaje como respuesta y los siguientes como followups
+        await interaction.response.send_message(bloques[0], ephemeral=True)
+        for bloque in bloques[1:]:
+            await interaction.followup.send(bloque, ephemeral=True)
+        
+        # view = PaginationView()
+        # view.data = data[topic]
+        # await interaction.response.send_message(embed=view.create_embed(view.data[:view.sep]), view=view)
 
     @tree.command(name="delete_question", description="Delete a question by ID (Professors only)")
     @app_commands.describe(topic="Topic name", id="Question ID (number)")
