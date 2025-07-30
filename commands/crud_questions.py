@@ -76,7 +76,7 @@ def register(tree: app_commands.CommandTree):
     @tree.command(name="list_questions", description="List questions for a topic (Professors only)")
     @app_commands.describe(topic="Topic name")
     @app_commands.autocomplete(topic=obtener_temas_autocompletado)
-    async def list_questions(interaction: Interaction, topic: str):
+    async def list_questions(interaction: discord.Interaction, topic: str):
         if not is_professor(interaction):
             await interaction.response.send_message("⛔ This command is for professors only.", ephemeral=True)
             return
