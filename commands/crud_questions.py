@@ -82,19 +82,20 @@ def register(tree: app_commands.CommandTree):
             return
 
         try:
-            
             data = read_questions()
+
             if topic not in data or not data[topic]:
                 await interaction.response.send_message(f"📭 No questions found for `{topic}`.", ephemeral=True)
                 return
-            
-            await interaction.response.send_message("teste passou do No question found", ephemeral=True)
 
-            pagination_view = PaginationView(data[topic], ephemeral=True)
-            await interaction.response.send_message("teste passou do getPaginationView", ephemeral=True)
-            pagination_view.message = interaction
-            await interaction.response.send_message("teste passou do interection message", ephemeral=True)
-            await pagination_view.send_message(content=None, view=pagination_view, ephemeral=True)
+            view = PaginationView(timeout=None)
+            view.data = data[topic]  # ✅ atribuindo os dados aqui
+
+            await interaction.response.send_message(
+                embed=view.create_embed(view.get_current_page_data()),
+                view=view,
+                ephemeral=True  # opcional, pode remover se quiser mostrar publicamente
+            )
 
         except Exception as e:
             await interaction.response.send_message(f"❌ An error occurred: {str(e)}", ephemeral=True)
