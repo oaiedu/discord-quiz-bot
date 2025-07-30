@@ -1,6 +1,7 @@
 import os
 import json
 import discord
+import traceback
 from discord import app_commands, Interaction
 from views.pagination import PaginationView
 
@@ -91,7 +92,9 @@ def register(tree: app_commands.CommandTree):
             await pagination_view.send(interaction)
 
         except Exception as e:
-            await interaction.response.send_message(f"❌ An error occurred: {str(e)}", ephemeral=True)
+            print("Erro em list_questions:")
+            traceback.print_exc()  # mostra a stack trace completa no console
+            await interaction.followup.send(f"❌ An error occurred: {e}", ephemeral=True)
 
 
 

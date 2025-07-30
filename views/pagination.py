@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+import traceback
 import utils
 
 class PaginationView(discord.ui.View):
@@ -14,11 +15,16 @@ class PaginationView(discord.ui.View):
     current_page : int = 1
     sep : int = 1
     async def send(self, interaction: discord.Interaction):
-        until_item = self.current_page * self.sep
-        embed = self.create_embed(self.data[:until_item])
-        await interaction.response.send_message(embed=embed, view=self, ephemeral=self.ephemeral)
-        self.message = await interaction.original_response()
-
+        try:
+            print("Enviando página inicial...")
+            until_item = self.current_page * self.sep
+            embed = self.create_embed(self.data[:until_item])
+            await interaction.response.send_message(embed=embed, view=self, ephemeral=self.ephemeral)
+            self.message = await interaction.original_response()
+            print("Mensagem enviada com sucesso.")
+        except Exception as e:
+            print("Erro ao enviar mensagem inicial:")
+            traceback.print_exc()
 
     def create_embed(self, data):
         embed = discord.Embed(title="Questions")
