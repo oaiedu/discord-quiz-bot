@@ -3,6 +3,7 @@ import discord
 from discord.ext import commands
 from commands.crud_questions import read_questions
 import utils
+import math
 
 logger = settings.logging.getLogger("bot")
 
@@ -46,38 +47,30 @@ class PaginationView(discord.ui.View):
         await self.message.edit(embed=self.create_embed(data), view=self)
 
     def update_buttons(self):
-        if self.current_page == 1:
-            self.first_page_button.disabled = True
-            self.prev_button.disabled = True
-            self.first_page_button.style = discord.ButtonStyle.gray
-            self.prev_button.style = discord.ButtonStyle.gray
-        else:
-            self.first_page_button.disabled = False
-            self.prev_button.disabled = False
-            self.first_page_button.style = discord.ButtonStyle.green
-            self.prev_button.style = discord.ButtonStyle.primary
+        total_pages = math.ceil(len(self.data) / self.sep)
 
-        if self.current_page == int(len(self.data) / self.sep) + 1:
-            self.next_button.disabled = True
-            self.last_page_button.disabled = True
-            self.last_page_button.style = discord.ButtonStyle.gray
-            self.next_button.style = discord.ButtonStyle.gray
+        # Desabilita anterior se na primeira página
+        if self.current_page == 1:
+            self.children[0].disabled = True  # first_page_button
+            self.children[1].disabled = True  # prev_button
         else:
-            self.next_button.disabled = False
-            self.last_page_button.disabled = False
-            self.last_page_button.style = discord.ButtonStyle.green
-            self.next_button.style = discord.ButtonStyle.primary
+            self.children[0].disabled = False
+            self.children[1].disabled = False
+
+        # Desabilita próximo se na última página
+        if self.current_page >= total_pages:
+            self.children[2].disabled = True  # next_button
+            self.children[3].disabled = True  # last_page_button
+        else:
+            self.children[2].disabled = False
+            self.children[3].disabled = False
+
 
     def get_current_page_data(self):
+        from_item = (self.current_page - 1) * self.sep
         until_item = self.current_page * self.sep
-        from_item = until_item - self.sep
-        if not self.current_page == 1:
-            from_item = 0
-            until_item = self.sep
-        if self.current_page == int(len(self.data) / self.sep) + 1:
-            from_item = self.current_page * self.sep - self.sep
-            until_item = len(self.data)
         return self.data[from_item:until_item]
+
 
 
     @discord.ui.button(label="|<",
