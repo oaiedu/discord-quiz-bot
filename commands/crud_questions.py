@@ -80,23 +80,30 @@ def register(tree: app_commands.CommandTree):
         if not is_professor(interaction):
             await interaction.response.send_message("⛔ This command is for professors only.", ephemeral=True)
             return
+        
+        data = read_questions()
+        if topic not in data or not data[topic]:
+            await interaction.response.send_message(f"📭 No questions found for `{topic}`.", ephemeral=True)
+            return
+        
+        preguntas = data[topic]
+        bloques = []
+        bloque_actual = f"📚 Questions for `{topic}`:\n"
 
-        try:
-            data = read_questions()
+        for i, q in enumerate(preguntas, start=1):
+            linea = f"{i}. {q['pregunta']} (Answer: {q['respuesta']})\n"
+            if len(bloque_actual) + len(linea) > 2000:
+                bloques.append(bloque_actual)
+                bloque_actual = ""
+            bloque_actual += linea
 
-            if topic not in data or not data[topic]:
-                await interaction.response.send_message(f"📭 No questions found for `{topic}`.", ephemeral=True)
-                return
+        if bloque_actual:
+            bloques.append(bloque_actual)
 
-            pagination_view = PaginationView(data[topic], timeout=None)
-            await pagination_view.send_interaction(interaction)
-
-        except Exception as e:
-            # Você já respondeu? Use followup!
-            try:
-                await interaction.followup.send(f"❌ An error occurred: {str(e)}", ephemeral=True)
-            except:
-                await interaction.response.send_message(f"❌ An error occurred: {str(e)}", ephemeral=True)
+        # Enviar el primer mensaje como respuesta y los siguientes como followups
+        await interaction.response.send_message(bloques[0], ephemeral=True)
+        for bloque in bloques[1:]:
+            await interaction.followup.send(bloque, ephemeral=True)
 
 
 
