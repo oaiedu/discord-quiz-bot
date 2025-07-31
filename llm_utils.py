@@ -1,3 +1,4 @@
+from firebase_init import db  # certifique-se que isso está no topo
 import os
 import json
 import fitz  # PyMuPDF
@@ -71,14 +72,28 @@ def enviar_a_openrouter(prompt):
     return response.json()["choices"][0]["message"]["content"]
 
 
-def guardar_preguntas_json(topico, preguntas_str):
+def guardar_preguntas_json(topico, preguntas_str, guild_id):
     try:
         preguntas_novas = json.loads(preguntas_str)
     except json.JSONDecodeError:
         print("⚠️ Error al parsear JSON generado. Verifica el output del modelo.")
         return
 
-    # Carregar perguntas existentes
+    # 🔥 Salva cada pergunta como documento dentro da subcoleção
+    batch = db.batch()
+    for idx, pregunta in enumerate(preguntas_novas):
+        pregunta_id = str(idx + 1)
+        doc_ref = db.collection("servers").document(str(guild_id)) \
+                   .collection("topics").document(topico) \
+                   .collection("questions").document(pregunta_id)
+        batch.set(doc_ref, {
+            "pregunta": pregunta.get("pregunta", ""),
+            "respuesta": pregunta.get("respuesta", "V")
+        })
+    batch.commit()
+    print(f"✅ {len(preguntas_novas)} preguntas guardadas en Firestore para el servidor {guild_id} y tópico '{topico}'")
+
+    # (Opcional) Também atualiza o preguntas.json local para manter compatibilidade com GCS ou visualização local
     if os.path.exists("preguntas.json"):
         with open("preguntas.json", "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -88,24 +103,15 @@ def guardar_preguntas_json(topico, preguntas_str):
     if topico not in data:
         data[topico] = []
 
-    # Determinar o próximo ID incremental
-    perguntas_existentes = data[topico]
-    ultimo_id = max(
-        [int(q["id"]) for q in perguntas_existentes if "id" in q and str(q["id"]).isdigit()],
-        default=0
-    )
-
     for i, pregunta in enumerate(preguntas_novas, start=1):
-        pregunta["id"] = str(ultimo_id + i)
-
-    # Atualizar os dados com as novas perguntas
-    data[topico].extend(preguntas_novas)
+        pregunta["id"] = str(len(data[topico]) + i)
+        data[topico].append(pregunta)
 
     with open("preguntas.json", "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-def generar_preguntas_desde_pdf(topico):
+def generar_preguntas_desde_pdf(topico, guild_id):
     pdf_path = os.path.join("docs", f"{topico}.pdf")
 
     if not os.path.exists(pdf_path):
@@ -114,4 +120,5 @@ def generar_preguntas_desde_pdf(topico):
     texto = extract_text_from_pdf(pdf_path)
     prompt = generar_prompt(texto, topico)
     resultado = enviar_a_openrouter(prompt)
-    guardar_preguntas_json(topico, resultado)
+    guardar_preguntas_json(topico, resultado, guild_id)
+

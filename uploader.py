@@ -6,7 +6,6 @@ import random
 
 RUTA_DOCS = "docs"
 
-
 async def handle_upload(ctx, nombre_topico):
     if not ctx.message.attachments:
         await ctx.send(

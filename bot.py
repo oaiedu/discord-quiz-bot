@@ -1,6 +1,7 @@
 # Docker-ready entry point for Discord Bot (for Cloud Run)
 
 import discord
+from dotenv import load_dotenv
 import os
 import json
 import random
@@ -8,6 +9,9 @@ from discord import app_commands
 from llm_utils import generar_preguntas_desde_pdf, subir_a_gcs, descargar_de_gcs
 import logging
 from commands import crud_questions
+from firebase_init import db, SERVER_TIMESTAMP
+
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 
@@ -119,11 +123,14 @@ async def upload(interaction: discord.Interaction, nombre_topico: str, archivo: 
     await archivo.save(ruta_pdf)
 
     try:
-        generar_preguntas_desde_pdf(nombre_topico)
+        guild_id = interaction.guild.id
+        generar_preguntas_desde_pdf(nombre_topico, guild_id)
+
         subir_a_gcs("preguntas.json", os.getenv("GCS_BUCKET_NAME"), "preguntas.json")
         await interaction.followup.send("🧠 Preguntas generadas correctamente desde el PDF.")
     except Exception as e:
         await interaction.followup.send(f"❌ Error al generar preguntas: {e}")
+
 
 
 
@@ -254,7 +261,16 @@ async def help_command(interaction: discord.Interaction):
 async def on_guild_join(guild: discord.Guild):
     logging.info(f"🆕 Bot adicionado ao servidor: {guild.name} (ID: {guild.id})")
 
-    # Tenta encontrar um canal de texto para enviar uma mensagem de boas-vindas
+    # 🔥 REGISTRA O SERVIDOR NO FIRESTORE (apenas dados essenciais)
+    try:
+        db.collection("servers").document(str(guild.id)).set({
+            "owner_id": str(guild.owner_id),
+            "joined_at": SERVER_TIMESTAMP
+        })
+        logging.info(f"📌 Servidor registrado no Firestore: {guild.id}")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar servidor no Firestore: {e}")
+
     canal = discord.utils.find(
         lambda c: c.permissions_for(guild.me).send_messages and isinstance(c, discord.TextChannel),
         guild.text_channels
@@ -263,8 +279,9 @@ async def on_guild_join(guild: discord.Guild):
     if canal:
         await canal.send(
             "👋 ¡Hola! Gracias por añadirme a este servidor.\n"
-            "Usa `/help` para ver cómo puedo ayudarte con quizzes de verdadero o falso. 🎓"
+            "Usa `/help` para ver cómo puedo ayudarte com quizzes de verdadero o falso. 🎓"
         )
+
 
 
 from keep_alive import keep_alive
