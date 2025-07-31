@@ -2,7 +2,6 @@ import os
 import json
 import discord
 from discord import app_commands, Interaction
-from views.pagination import PaginationView
 
 ROL_PROFESOR = "faculty"
 PREGUNTAS_JSON = "preguntas.json"
@@ -80,12 +79,12 @@ def register(tree: app_commands.CommandTree):
         if not is_professor(interaction):
             await interaction.response.send_message("⛔ This command is for professors only.", ephemeral=True)
             return
-        
+
         data = read_questions()
         if topic not in data or not data[topic]:
             await interaction.response.send_message(f"📭 No questions found for `{topic}`.", ephemeral=True)
             return
-        
+
         preguntas = data[topic]
         bloques = []
         bloque_actual = f"📚 Questions for `{topic}`:\n"
@@ -104,8 +103,6 @@ def register(tree: app_commands.CommandTree):
         await interaction.response.send_message(bloques[0], ephemeral=True)
         for bloque in bloques[1:]:
             await interaction.followup.send(bloque, ephemeral=True)
-
-
 
     @tree.command(name="delete_question", description="Delete a question by ID (Professors only)")
     @app_commands.describe(topic="Topic name", id="Question ID (number)")
