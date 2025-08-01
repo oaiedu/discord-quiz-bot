@@ -1,6 +1,6 @@
 import discord
 import os
-from llm_utils import generar_preguntas_desde_pdf
+from utils.llm_utils import generar_preguntas_desde_pdf
 import json
 import random
 

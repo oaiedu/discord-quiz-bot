@@ -6,38 +6,32 @@ import os
 import json
 import random
 from discord import app_commands
-from llm_utils import generar_preguntas_desde_pdf, subir_a_gcs, descargar_de_gcs
+from utils.llm_utils import generar_preguntas_desde_pdf
 import logging
 from commands import crud_questions
 from firebase_init import db, SERVER_TIMESTAMP
+from utils.utils import actualizar_ultima_interaccion, registrar_user_estadistica
 
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 
 RUTA_DOCS = "docs"
-RUTA_ESTADISTICAS = "estadisticas.json"
 ROL_PROFESOR = "faculty"
 
 
 def registrar_estadistica(usuario, topico, correctas, total):
-    datos = {}
-    if os.path.exists(RUTA_ESTADISTICAS):
-        with open(RUTA_ESTADISTICAS, "r", encoding="utf-8") as f:
-            datos = json.load(f)
-    uid = str(usuario.id)
-    if uid not in datos:
-        datos[uid] = {"nombre": usuario.name, "intentos": []}
-    datos[uid]["intentos"].append({
-        "tema": topico,
-        "correctas": correctas,
-        "total": total
-    })
-    with open(RUTA_ESTADISTICAS, "w", encoding="utf-8") as f:
-        json.dump(datos, f, indent=2, ensure_ascii=False)
-    # Subir a GCS
-    subir_a_gcs(RUTA_ESTADISTICAS, os.getenv("GCS_BUCKET_NAME"), RUTA_ESTADISTICAS)
-
+    try:
+        db.collection("estadisticas").add({
+            "usuario_id": str(usuario.id),
+            "nombre": usuario.name,
+            "tema": topico,
+            "correctas": correctas,
+            "total": total,
+            "timestamp": SERVER_TIMESTAMP
+        })
+    except Exception as e:
+        logging.error(f"Erro ao registrar estatística: {e}")
 
 
 class QuizBot(discord.Client):
@@ -52,7 +46,7 @@ class QuizBot(discord.Client):
 
     async def setup_hook(self):
         await self.tree.sync()
-        print("🌐 Slash commands sincronizados.")
+        print("\U0001F310 Slash commands sincronizados.")
 
 
 bot = QuizBot()
@@ -60,50 +54,49 @@ bot = QuizBot()
 crud_questions.register(bot.tree)
 
 
-
-
 @bot.event
 async def on_ready():
-    print(f"✅ Bot conectado como {bot.user}")
-    if not os.path.exists("preguntas.json"):
-        try:
-            descargar_de_gcs("preguntas.json", os.getenv("GCS_BUCKET_NAME"), "preguntas.json")
-            print("📥 preguntas.json descargado desde GCS.")
-        except Exception as e:
-            print(f"⚠️ No se pudo descargar preguntas.json: {e}")
-    if not os.path.exists(RUTA_ESTADISTICAS):
-        try:
-            descargar_de_gcs(RUTA_ESTADISTICAS, os.getenv("GCS_BUCKET_NAME"), RUTA_ESTADISTICAS)
-            print("📥 estadisticas.json descargado desde GCS.")
-        except Exception as e:
-            print(f"⚠️ No se pudo descargar estadisticas.json: {e}")
-
+    print(f"\u2705 Bot conectado como {bot.user}")
 
 
 @bot.tree.command(
     name="stats",
-    description=
-    "Muestra un resumen de los quizzes realizados por todos los usuarios (solo profesores)"
+    description="Muestra un resumen de los quizzes realizados por todos los usuarios (solo profesores)"
 )
 async def estadisticas(interaction: discord.Interaction):
+    actualizar_ultima_interaccion(interaction.guild.id)
+
     if not any(role.name.lower() == ROL_PROFESOR.lower()
                for role in interaction.user.roles):
         await interaction.response.send_message(
-            "⛔ Este comando solo está disponible para profesores.",
+            "\u26d4 Este comando solo está disponible para profesores.",
             ephemeral=True)
         return
-    if not os.path.exists(RUTA_ESTADISTICAS):
-        await interaction.response.send_message(
-            "📂 No hay estadísticas registradas todavía.")
-        return
-    with open(RUTA_ESTADISTICAS, "r", encoding="utf-8") as f:
-        datos = json.load(f)
-    resumen = "📊 **Estadísticas de uso del bot:**\n"
-    for uid, info in datos.items():
-        resumen += f"\n👤 {info['nombre']}: {len(info['intentos'])} intento(s)"
-        for intento in info['intentos'][-3:]:
-            resumen += f"\n  • {intento['tema']}: {intento['correctas']}/{intento['total']}"
-    await interaction.response.send_message(resumen)
+
+    try:
+        docs = db.collection("estadisticas").stream()
+        datos = {}
+        for doc in docs:
+            item = doc.to_dict()
+            uid = item.get("usuario_id")
+            if uid not in datos:
+                datos[uid] = {"nombre": item.get("nombre"), "intentos": []}
+            datos[uid]["intentos"].append(item)
+
+        if not datos:
+            await interaction.response.send_message("\ud83d\udcc2 No hay estadísticas registradas todavía.")
+            return
+
+        resumen = "\ud83d\udcca **Estadísticas de uso del bot:**\n"
+        for uid, info in datos.items():
+            resumen += f"\n\U0001F464 {info['nombre']}: {len(info['intentos'])} intento(s)"
+            for intento in info['intentos'][-3:]:
+                resumen += f"\n  • {intento['tema']}: {intento['correctas']}/{intento['total']}"
+
+        await interaction.response.send_message(resumen)
+    except Exception as e:
+        logging.error(f"Erro ao obter estadísticas: {e}")
+        await interaction.response.send_message("❌ Erro ao obter estadísticas.")
 
 
 @bot.tree.command(name="upload", description="Sube un PDF y genera preguntas automáticamente")
@@ -112,6 +105,8 @@ async def estadisticas(interaction: discord.Interaction):
     archivo="Archivo PDF con el contenido"
 )
 async def upload(interaction: discord.Interaction, nombre_topico: str, archivo: discord.Attachment):
+    actualizar_ultima_interaccion(interaction.guild.id)
+
     await interaction.response.defer(thinking=True)
 
     if not archivo.filename.endswith(".pdf"):
@@ -125,106 +120,117 @@ async def upload(interaction: discord.Interaction, nombre_topico: str, archivo: 
     try:
         guild_id = interaction.guild.id
         generar_preguntas_desde_pdf(nombre_topico, guild_id)
-
-        subir_a_gcs("preguntas.json", os.getenv("GCS_BUCKET_NAME"), "preguntas.json")
-        await interaction.followup.send("🧠 Preguntas generadas correctamente desde el PDF.")
+        await interaction.followup.send("\U0001F9E0 Preguntas generadas correctamente desde el PDF.")
     except Exception as e:
         await interaction.followup.send(f"❌ Error al generar preguntas: {e}")
 
 
-
-
-@bot.tree.command(name="topics",
-                  description="Muestra los temas disponibles para hacer quizzes")
+@bot.tree.command(name="topics", description="Muestra los temas disponibles para hacer quizzes")
 async def topics(interaction: discord.Interaction):
-    logging.info("Slash command /topics triggered by user: %s", interaction.user)
-
-    if not os.path.exists("preguntas.json"):
-        logging.warning("Archivo 'preguntas.json' no encontrado.")
-        await interaction.response.send_message(
-            "❌ No se encontró el archivo `preguntas.json`.")
-        return
-
+    actualizar_ultima_interaccion(interaction.guild.id)
     try:
-        with open("preguntas.json", "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except json.JSONDecodeError as e:
-        logging.error("Error al cargar JSON: %s", e)
-        await interaction.response.send_message(
-            "❌ Error al leer el archivo de preguntas.")
-        return
-
-    if not data:
-        logging.info("El archivo 'preguntas.json' está vacío.")
-        await interaction.response.send_message(
-            "❌ No hay temas disponibles todavía.")
-        return
-
-    temas = "\n".join(f"- {t}" for t in data.keys())
-    logging.info("Temas encontrados: %s", temas.replace("\n", ", "))
-    await interaction.response.send_message(f"📚 Temas disponibles:\n{temas}")
+        temas_docs = db.collection("servers") \
+                       .document(str(interaction.guild.id)) \
+                       .collection("topics") \
+                       .get()
+        
+        if not temas_docs:
+            await interaction.response.send_message("❌ No hay temas disponibles todavía.")
+            return
+        
+        temas = "\n".join(f"- {doc.id}" for doc in temas_docs)
+        await interaction.response.send_message(f"📚 Temas disponibles:\n{temas}")
+    except Exception as e:
+        logging.error(f"Erro ao carregar tópicos: {e}")
+        await interaction.response.send_message("❌ Erro ao carregar os temas.")
 
 async def obtener_temas_autocompletado(interaction: discord.Interaction, current: str):
-    if not os.path.exists("preguntas.json"):
+    try:
+        docs = db.collection("servers") \
+                 .document(str(interaction.guild.id)) \
+                 .collection("topics") \
+                 .get()
+
+        # Extrair os nomes dos tópicos (IDs dos documentos)
+        nomes_temas = [doc.id for doc in docs]
+
+        resultados = [
+            app_commands.Choice(name=nome, value=nome)
+            for nome in nomes_temas if current.lower() in nome.lower()
+        ][:25]  # limitar a 25 sugestões como recomendado pelo Discord
+
+        return resultados
+    except Exception as e:
+        logging.error(f"Erro ao obter temas para autocompletar: {e}")
         return []
-    with open("preguntas.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    return [
-        app_commands.Choice(name=tema, value=tema)
-        for tema in data.keys() if current.lower() in tema.lower()
-    ][:25]  # Discord permite hasta 25 opciones
-
 
 
 @bot.tree.command(name="quiz", description="Haz un quiz de 5 preguntas sobre un tema")
 @app_commands.describe(nombre_topico="Nombre del tema")
 @app_commands.autocomplete(nombre_topico=obtener_temas_autocompletado)
 async def quiz(interaction: discord.Interaction, nombre_topico: str):
-    if not os.path.exists("preguntas.json"):
-        await interaction.response.send_message(
-            "❌ No se encontró el archivo `preguntas.json`.")
-        return
-    with open("preguntas.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
-    if nombre_topico not in data:
-        await interaction.response.send_message(
-            f"❌ No hay preguntas registradas para el tema `{nombre_topico}`.")
-        return
-    preguntas = random.sample(data[nombre_topico], min(5, len(data[nombre_topico])))
-    texto_quiz = "📝 Responde con V o F (por ejemplo: `VFVFV`):\n"
-    for idx, p in enumerate(preguntas):
-        texto_quiz += f"\n{idx+1}. {p['pregunta']}"
-    await interaction.response.send_message(texto_quiz)
-
-    def check(m):
-        return (m.author == interaction.user and m.channel.id == interaction.channel_id and len(m.content.strip()) == len(preguntas))
+    if interaction.guild:
+        actualizar_ultima_interaccion(interaction.guild.id)
 
     try:
-        respuesta = await bot.wait_for("message", check=check, timeout=60.0)
-        respuesta_str = respuesta.content.strip().upper()
-    except:
-        await interaction.followup.send("⏰ Tiempo agotado. Intenta nuevamente.")
-        return
+        preguntas_ref = db.collection("servers") \
+                          .document(str(interaction.guild.id)) \
+                          .collection("topics") \
+                          .document(nombre_topico) \
+                          .collection("questions")
+        
+        docs = preguntas_ref.stream()
+        preguntas_data = [doc.to_dict() for doc in docs]
 
-    resultado = "\n📊 Resultados:\n"
-    correctas = 0
-    for i, r in enumerate(respuesta_str):
-        correcta = preguntas[i]['respuesta'].upper()
-        if r == correcta:
-            resultado += f"✅ {i+1}. Correcto\n"
-            correctas += 1
-        else:
-            resultado += f"❌ {i+1}. Incorrecto (Respuesta correcta: {correcta})\n"
-    resultado += f"\n🏁 Has acertado {correctas} de {len(preguntas)} preguntas."
-    await interaction.followup.send(resultado)
-    registrar_estadistica(interaction.user, nombre_topico, correctas, len(preguntas))
+        if not preguntas_data:
+            await interaction.response.send_message(f"❌ No hay preguntas registradas para el tema `{nombre_topico}`.")
+            return
 
+        preguntas = random.sample(preguntas_data, min(5, len(preguntas_data)))
+        texto_quiz = "\ud83d\udcdd Responde con V o F (por ejemplo: `VFVFV`):\n"
+        for idx, p in enumerate(preguntas):
+            texto_quiz += f"\n{idx+1}. {p['pregunta']}"
 
-@bot.tree.command(name="help",
-                  description="Explica cómo usar el bot y sus comandos disponibles")
+        await interaction.response.send_message(texto_quiz)
+
+        def check(m):
+            return (
+                m.author == interaction.user and
+                m.channel.id == interaction.channel_id and
+                len(m.content.strip()) == len(preguntas)
+            )
+
+        try:
+            respuesta = await bot.wait_for("message", check=check, timeout=60.0)
+            respuesta_str = respuesta.content.strip().upper()
+        except:
+            await interaction.followup.send("⏰ Tiempo agotado. Intenta nuevamente.")
+            return
+
+        resultado = "\n\ud83d\udcca Resultados:\n"
+        correctas = 0
+        for i, r in enumerate(respuesta_str):
+            correcta = preguntas[i]['respuesta'].upper()
+            if r == correcta:
+                resultado += f"✅ {i+1}. Correcto\n"
+                correctas += 1
+            else:
+                resultado += f"❌ {i+1}. Incorrecto (Respuesta correcta: {correcta})\n"
+
+        resultado += f"\n\U0001F3C1 Has acertado {correctas} de {len(preguntas)} preguntas."
+        await interaction.followup.send(resultado)
+
+        registrar_user_estadistica(interaction.user, nombre_topico, correctas, len(preguntas))
+
+    except Exception as e:
+        logging.error(f"Erro ao realizar quiz: {e}")
+        await interaction.response.send_message("❌ Ocurrió un error durante el quiz.")
+
+@bot.tree.command(name="help", description="Explica cómo usar el bot y sus comandos disponibles")
 async def help_command(interaction: discord.Interaction):
-    await interaction.response.defer(thinking=True, ephemeral=True)  # Evita expiració
+    actualizar_ultima_interaccion(interaction.guild.id)
+
+    await interaction.response.defer(thinking=True, ephemeral=True)
 
     es_profe = False
     if interaction.guild:
@@ -233,21 +239,19 @@ async def help_command(interaction: discord.Interaction):
 
     if es_profe:
         mensaje = (
-            "📘 **Guía para profesores**\n\n"
+            "\ud83d\udcd8 **Guía para profesores**\n\n"
             "👉 `/quiz <tema>` — Lanza un quiz de 5 preguntas de verdadero o falso.\n"
             "👉 `/topics` — Lista los temas disponibles para practicar.\n"
             "👉 `/upload <tema>` — Sube un PDF para generar nuevas preguntas.\n"
             "👉 `/stats` — Consulta los resultados de todos los estudiantes.\n"
-            "👉 `/add_question` — Añade manualmente una pregunta a un tema.\n"
-            "👉 `/list_questions` — Lista las preguntas existentes de un tema.\n"
-            "👉 `/delete_question` — Elimina una pregunta de un tema mediante su número.\n\n"
+            "👉 `/add_question`, `/list_questions`, `/delete_question` — Gestión manual de preguntas.\n\n"
             "💬 Para responder un quiz, contesta con una secuencia como `VFVFV`.\n"
             "⏱️ Tienes 60 segundos para responder cada quiz.\n"
             "🧠 ¡Buena práctica!"
         )
     else:
         mensaje = (
-            "📘 **Guía para estudiantes**\n\n"
+            "\ud83d\udcd8 **Guía para estudiantes**\n\n"
             "👉 `/quiz <tema>` — Lanza un quiz de 5 preguntas de verdadero o falso.\n"
             "👉 `/topics` — Lista los temas disponibles para practicar.\n\n"
             "💬 Para responder un quiz, contesta con una secuencia como `VFVFV`.\n"
@@ -257,20 +261,39 @@ async def help_command(interaction: discord.Interaction):
 
     await interaction.followup.send(mensaje, ephemeral=True)
 
+
 @bot.event
 async def on_guild_join(guild: discord.Guild):
     logging.info(f"🆕 Bot adicionado ao servidor: {guild.name} (ID: {guild.id})")
 
-    # 🔥 REGISTRA O SERVIDOR NO FIRESTORE (apenas dados essenciais)
     try:
         db.collection("servers").document(str(guild.id)).set({
             "owner_id": str(guild.owner_id),
-            "joined_at": SERVER_TIMESTAMP
+            "server_id": str(guild.id),
+            "joined_at": SERVER_TIMESTAMP,
+            "status": "Active"
         })
-        logging.info(f"📌 Servidor registrado no Firestore: {guild.id}")
-    except Exception as e:
-        logging.error(f"❌ Erro ao registrar servidor no Firestore: {e}")
 
+        # Adiciona cada membro à subcoleção 'usuarios'
+        for member in guild.members:
+            if member.bot:
+                continue  # Ignora bots
+            db.collection("servers") \
+              .document(str(guild.id)) \
+              .collection("users") \
+              .document(str(member.id)) \
+              .set({
+                  "user_id": str(member.id),
+                  "name": member.name,
+                  "joined_bot_at": SERVER_TIMESTAMP
+              })
+        
+        logging.info(f"📌 Servidor e usuários registrados no Firestore: {guild.id}")
+
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar servidor ou usuários no Firestore: {e}")
+
+    # Envia mensagem de boas-vindas no primeiro canal disponível
     canal = discord.utils.find(
         lambda c: c.permissions_for(guild.me).send_messages and isinstance(c, discord.TextChannel),
         guild.text_channels
@@ -282,9 +305,20 @@ async def on_guild_join(guild: discord.Guild):
             "Usa `/help` para ver cómo puedo ayudarte com quizzes de verdadero o falso. 🎓"
         )
 
+@bot.event
+async def on_guild_remove(guild: discord.Guild):
+    print(f"🔌 Bot removido do servidor: {guild.name} ({guild.id})")
 
+    # Atualiza o campo 'status' no Firestore
+    try:
+        db.collection("servers").document(str(guild.id)).update({
+            "status": "disabled"
+        })
+        print(f"📁 Status do servidor {guild.id} atualizado para 'disabled'")
+    except Exception as e:
+        print(f"❌ Erro ao atualizar status do servidor {guild.id}: {e}")        
 
-from keep_alive import keep_alive
+from utils.keep_alive import keep_alive
 
 keep_alive()
 bot.run(os.getenv("DISCORD_TOKEN"))

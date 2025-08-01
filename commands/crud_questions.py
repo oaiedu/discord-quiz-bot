@@ -3,6 +3,8 @@ import json
 import discord
 from discord import app_commands, Interaction
 
+from utils.utils import actualizar_ultima_interaccion
+
 ROL_PROFESOR = "faculty"
 PREGUNTAS_JSON = "preguntas.json"
 
@@ -41,6 +43,8 @@ def register(tree: app_commands.CommandTree):
     )
     @app_commands.autocomplete(topic=obtener_temas_autocompletado)
     async def add_question(interaction: Interaction, topic: str, question: str, answer: str):
+        actualizar_ultima_interaccion(interaction.guild.id)
+
         if not is_professor(interaction):
             await interaction.response.send_message("⛔ This command is for professors only.", ephemeral=True)
             return
@@ -76,6 +80,8 @@ def register(tree: app_commands.CommandTree):
     @app_commands.describe(topic="Topic name")
     @app_commands.autocomplete(topic=obtener_temas_autocompletado)
     async def list_questions(interaction: Interaction, topic: str):
+        actualizar_ultima_interaccion(interaction.guild.id)
+
         if not is_professor(interaction):
             await interaction.response.send_message("⛔ This command is for professors only.", ephemeral=True)
             return
@@ -108,6 +114,8 @@ def register(tree: app_commands.CommandTree):
     @app_commands.describe(topic="Topic name", id="Question ID (number)")
     @app_commands.autocomplete(topic=obtener_temas_autocompletado)
     async def delete_question(interaction: Interaction, topic: str, id: str):
+        actualizar_ultima_interaccion(interaction.guild.id)
+        
         if not is_professor(interaction):
             await interaction.response.send_message("⛔ This command is for professors only.", ephemeral=True)
             return

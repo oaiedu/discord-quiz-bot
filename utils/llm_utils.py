@@ -1,10 +1,13 @@
-from firebase_init import db  # certifique-se que isso está no topo
+from firebase_init import db, SERVER_TIMESTAMP  # certifique-se que isso está no topo
 import os
+from dotenv import load_dotenv
 import json
 import fitz  # PyMuPDF
 import requests
 import uuid  # Adicione esta importação ao topo do arquivo
 from google.cloud import storage
+
+load_dotenv()
 
 # Clave de API desde secrets de Replit
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -50,50 +53,66 @@ Contenido:
 
 
 def enviar_a_openrouter(prompt):
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "Referer": "https://replit.com/@marcgc21",  # reemplázalo si quieres
-        "X-Title": "Discord Quiz Bot"
-    }
+    try:
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "Referer": "https://replit.com/@marcgc21",  # reemplázalo si quieres
+            "X-Title": "Discord Quiz Bot"
+        }
 
-    payload = {
-        "model": LLM_MODEL,
-        "messages": [{
-            "role": "user",
-            "content": prompt
-        }],
-        "temperature": 0.7
-    }
+        payload = {
+            "model": LLM_MODEL,
+            "messages": [{
+                "role": "user",
+                "content": prompt
+            }],
+            "temperature": 0.7
+        }
 
-    response = requests.post(url, headers=headers, json=payload)
-    response.raise_for_status()
-    return response.json()["choices"][0]["message"]["content"]
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        print("ERRO NO OPENROUTER", e)
 
 
-def guardar_preguntas_json(topico, preguntas_str, guild_id):
+def guardar_preguntas_json(topico, preguntas_str, guild_id, document_name, document_url):
     try:
         preguntas_novas = json.loads(preguntas_str)
     except json.JSONDecodeError:
         print("⚠️ Error al parsear JSON generado. Verifica el output del modelo.")
         return
 
-    # 🔥 Salva cada pergunta como documento dentro da subcoleção
+    # 1️⃣ Criar o documento do tópico com ID autogerado
+    topic_ref = db.collection("servers").document(str(guild_id)).collection("topics").document()
+    topic_id = topic_ref.id  # ID gerado automaticamente
+
+    # 2️⃣ Salvar os metadados do tópico
+    topic_data = {
+        "title": topico,
+        "created_at": SERVER_TIMESTAMP,
+        "document_name": document_name,
+        "document_storage_url": document_url,
+        "num_quizzes_generated": len(preguntas_novas)
+    }
+    topic_ref.set(topic_data)
+
+    # 3️⃣ Adicionar perguntas como subdocumentos
     batch = db.batch()
     for idx, pregunta in enumerate(preguntas_novas):
         pregunta_id = str(idx + 1)
-        doc_ref = db.collection("servers").document(str(guild_id)) \
-                   .collection("topics").document(topico) \
-                   .collection("questions").document(pregunta_id)
+        doc_ref = topic_ref.collection("questions").document(pregunta_id)
         batch.set(doc_ref, {
             "pregunta": pregunta.get("pregunta", ""),
             "respuesta": pregunta.get("respuesta", "V")
         })
     batch.commit()
+
     print(f"✅ {len(preguntas_novas)} preguntas guardadas en Firestore para el servidor {guild_id} y tópico '{topico}'")
 
-    # (Opcional) Também atualiza o preguntas.json local para manter compatibilidade com GCS ou visualização local
+    # 4️⃣ Atualiza local preguntas.json
     if os.path.exists("preguntas.json"):
         with open("preguntas.json", "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -120,5 +139,5 @@ def generar_preguntas_desde_pdf(topico, guild_id):
     texto = extract_text_from_pdf(pdf_path)
     prompt = generar_prompt(texto, topico)
     resultado = enviar_a_openrouter(prompt)
-    guardar_preguntas_json(topico, resultado, guild_id)
+    guardar_preguntas_json(topico, resultado, guild_id, f"{topico.pdf}", "")
 
