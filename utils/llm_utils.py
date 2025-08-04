@@ -6,6 +6,7 @@ import fitz  # PyMuPDF
 import requests
 import uuid  # Adicione esta importação ao topo do arquivo
 from google.cloud import storage
+from repositories.topic_repository import criar_topico_com_perguntas
 
 load_dotenv()
 
@@ -85,30 +86,7 @@ def guardar_preguntas_json(topico, preguntas_str, guild_id, document_name, docum
         print("⚠️ Error al parsear JSON generado. Verifica el output del modelo.")
         return
 
-    # 1️⃣ Criar o documento do tópico com ID autogerado
-    topic_ref = db.collection("servers").document(str(guild_id)).collection("topics").document()
-    topic_id = topic_ref.id  # ID gerado automaticamente
-
-    # 2️⃣ Salvar os metadados do tópico
-    topic_data = {
-        "title": topico,
-        "created_at": SERVER_TIMESTAMP,
-        "document_name": document_name,
-        "document_storage_url": document_url,
-        "num_quizzes_generated": len(preguntas_novas)
-    }
-    topic_ref.set(topic_data)
-
-    # 3️⃣ Adicionar perguntas como subdocumentos
-    batch = db.batch()
-    for idx, pregunta in enumerate(preguntas_novas):
-        pregunta_id = str(idx + 1)
-        doc_ref = topic_ref.collection("questions").document(pregunta_id)
-        batch.set(doc_ref, {
-            "pregunta": pregunta.get("pregunta", ""),
-            "respuesta": pregunta.get("respuesta", "V")
-        })
-    batch.commit()
+    topic_id = criar_topico_com_perguntas(guild_id, topico, preguntas_novas, document_name, document_url)
 
     print(f"✅ {len(preguntas_novas)} preguntas guardadas en Firestore para el servidor {guild_id} y tópico '{topico}'")
 
@@ -139,5 +117,5 @@ def generar_preguntas_desde_pdf(topico, guild_id):
     texto = extract_text_from_pdf(pdf_path)
     prompt = generar_prompt(texto, topico)
     resultado = enviar_a_openrouter(prompt)
-    guardar_preguntas_json(topico, resultado, guild_id, f"{topico.pdf}", "")
+    guardar_preguntas_json(topico, resultado, guild_id, f"{topico}.pdf", "")
 

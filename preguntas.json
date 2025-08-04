@@ -1,0 +1,104 @@
+{
+  "dudu": [
+    {
+      "pregunta": "What is a standard?",
+      "respuesta": "V",
+      "id": "1"
+    },
+    {
+      "pregunta": "A standard is a document, established by an authority, custom, or general consent as a model or example.",
+      "respuesta": "V",
+      "id": "3"
+    },
+    {
+      "pregunta": "A standard is a document, established by consensus and approved by a recognized body, that provides, for common and repeated use, rules, guidelines or characteristics for activities or their results, aimed at the achievement of the optimum degree of order in a given context.",
+      "respuesta": "V",
+      "id": "5"
+    },
+    {
+      "pregunta": "The ability to apply software development and maintenance methodologies and procedures of the highest professional level is a benefit of using standards.",
+      "respuesta": "V",
+      "id": "7"
+    },
+    {
+      "pregunta": "Better mutual understanding and coordination among development teams is a benefit of using standards.",
+      "respuesta": "V",
+      "id": "9"
+    },
+    {
+      "pregunta": "Greater cooperation with external participants in the project is a benefit of using standards.",
+      "respuesta": "V",
+      "id": "11"
+    },
+    {
+      "pregunta": "Better understanding and cooperation between suppliers and customers is a benefit of using standards.",
+      "respuesta": "V",
+      "id": "13"
+    },
+    {
+      "pregunta": "Do you know some standard?",
+      "respuesta": "V",
+      "id": "15"
+    },
+    {
+      "pregunta": "Environment management is a type of standard.",
+      "respuesta": "V",
+      "id": "17"
+    },
+    {
+      "pregunta": "Security is a type of standard.",
+      "respuesta": "V",
+      "id": "19"
+    },
+    {
+      "pregunta": "Information management is a type of standard.",
+      "respuesta": "V",
+      "id": "21"
+    },
+    {
+      "pregunta": "ISO/IEC 15948 is a standard.",
+      "respuesta": "V",
+      "id": "23"
+    },
+    {
+      "pregunta": "ISO 32000-1 is a standard.",
+      "respuesta": "V",
+      "id": "25"
+    },
+    {
+      "pregunta": "IEEE (Institute of Electrical and Electronics Engineers) Computer Society is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "27"
+    },
+    {
+      "pregunta": "ISO (International Organization for Standardization) is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "29"
+    },
+    {
+      "pregunta": "DOD (US Department of Defense) is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "31"
+    },
+    {
+      "pregunta": "ANSI (American National Standards Institute) is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "33"
+    },
+    {
+      "pregunta": "IEC (International Electrotechnical Commission) is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "35"
+    },
+    {
+      "pregunta": "EIA (Electronic Industries Association) is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "37"
+    },
+    {
+      "pregunta": "The provision of updated international standards is a way to contribute to standards development.",
+      "respuesta": "V",
+      "id": "39"
+    }
+  ]
+}
