@@ -14,12 +14,16 @@ load_dotenv()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 LLM_MODEL = "mistralai/mistral-7b-instruct:free"
 
+def extract_text_from_pdf(pdf_url):
+    response = requests.get(pdf_url)
+    response.raise_for_status()
 
-def extract_text_from_pdf(pdf_path):
+    doc = fitz.open(stream=response.content, filetype="pdf")
+
     text = ""
-    doc = fitz.open(pdf_path)
     for page in doc:
         text += page.get_text()
+
     return text
 
 
@@ -39,18 +43,18 @@ def descargar_de_gcs(nombre_remoto, nombre_bucket, nombre_local):
 
 def generar_prompt(texto, topico):
     return f"""
-Eres un generador de preguntas. Basándote en el siguiente contenido, genera 50 preguntas de verdadero o falso.
-Devuélvelas en formato JSON como este:
-[
-  {{ "pregunta": "...", "respuesta": "V" }},
-  ...
-]
+        Eres un generador de preguntas. Basándote en el siguiente contenido, genera 50 preguntas de verdadero o falso.
+        Devuélvelas en formato JSON como este:
+        [
+        {{ "pregunta": "...", "respuesta": "V" }},
+        ...
+        ]
 
-Tema: {topico}
+        Tema: {topico}
 
-Contenido:
-{texto[:4000]}  # limitamos para tokens, ajustable
-"""
+        Contenido:
+        {texto[:4000]}  # limitamos para tokens, ajustable
+    """
 
 
 def enviar_a_openrouter(prompt):
@@ -79,18 +83,17 @@ def enviar_a_openrouter(prompt):
         print("ERRO NO OPENROUTER", e)
 
 
-def guardar_preguntas_json(topico, preguntas_str, guild_id, document_name, document_url):
+def guardar_preguntas_json(topico, preguntas_str, guild_id, document_url):
     try:
         preguntas_novas = json.loads(preguntas_str)
     except json.JSONDecodeError:
         print("⚠️ Error al parsear JSON generado. Verifica el output del modelo.")
         return
 
-    topic_id = criar_topico_com_perguntas(guild_id, topico, preguntas_novas, document_name, document_url)
+    criar_topico_com_perguntas(guild_id, topico, preguntas_novas, document_url)
 
     print(f"✅ {len(preguntas_novas)} preguntas guardadas en Firestore para el servidor {guild_id} y tópico '{topico}'")
 
-    # 4️⃣ Atualiza local preguntas.json
     if os.path.exists("preguntas.json"):
         with open("preguntas.json", "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -108,14 +111,8 @@ def guardar_preguntas_json(topico, preguntas_str, guild_id, document_name, docum
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-def generar_preguntas_desde_pdf(topico, guild_id):
-    pdf_path = os.path.join("docs", f"{topico}.pdf")
-
-    if not os.path.exists(pdf_path):
-        raise FileNotFoundError(f"❌ No se encontró el archivo: {pdf_path}")
-
-    texto = extract_text_from_pdf(pdf_path)
+def generar_preguntas_desde_pdf(topico, guild_id, pdf_url):
+    texto = extract_text_from_pdf(pdf_url)
     prompt = generar_prompt(texto, topico)
     resultado = enviar_a_openrouter(prompt)
-    guardar_preguntas_json(topico, resultado, guild_id, f"{topico}.pdf", "")
-
+    guardar_preguntas_json(topico, resultado, guild_id, pdf_url)

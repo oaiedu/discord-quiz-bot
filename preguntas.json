@@ -100,5 +100,644 @@
       "respuesta": "V",
       "id": "39"
     }
+  ],
+  "marc": [
+    {
+      "pregunta": "What is a standard?",
+      "respuesta": "V",
+      "id": "1"
+    },
+    {
+      "pregunta": "A standard is a document established by an authority, custom, or general consent as a model or example.",
+      "respuesta": "V",
+      "id": "3"
+    },
+    {
+      "pregunta": "What is a standard? (ISO/IEC TR 29110-1:2016)",
+      "respuesta": "V",
+      "id": "5"
+    },
+    {
+      "pregunta": "What are some benefits of standards?",
+      "respuesta": "V",
+      "id": "7"
+    },
+    {
+      "pregunta": "The ability to apply software development and maintenance methodologies and procedures of the highest professional level is a benefit of standards.",
+      "respuesta": "V",
+      "id": "9"
+    },
+    {
+      "pregunta": "Better mutual understanding and coordination among development teams is a benefit of standards.",
+      "respuesta": "V",
+      "id": "11"
+    },
+    {
+      "pregunta": "Greater cooperation with external participants in the project is a benefit of standards.",
+      "respuesta": "V",
+      "id": "13"
+    },
+    {
+      "pregunta": "Better understanding and cooperation between suppliers and customers is a benefit of standards.",
+      "respuesta": "V",
+      "id": "15"
+    },
+    {
+      "pregunta": "Do you know some standard?",
+      "respuesta": "V",
+      "id": "17"
+    },
+    {
+      "pregunta": "Environment management is a type of standard.",
+      "respuesta": "V",
+      "id": "19"
+    },
+    {
+      "pregunta": "Security is a type of standard.",
+      "respuesta": "V",
+      "id": "21"
+    },
+    {
+      "pregunta": "Information management is a type of standard.",
+      "respuesta": "V",
+      "id": "23"
+    },
+    {
+      "pregunta": "ISO/IEC 15948 is a standard.",
+      "respuesta": "V",
+      "id": "25"
+    },
+    {
+      "pregunta": "ISO 32000-1 is a standard.",
+      "respuesta": "V",
+      "id": "27"
+    },
+    {
+      "pregunta": "IEEE (Institute of Electrical and Electronics Engineers) Computer Society is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "29"
+    },
+    {
+      "pregunta": "ISO (International Organization for Standardization) is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "31"
+    },
+    {
+      "pregunta": "DOD (US Department of Defense) is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "33"
+    },
+    {
+      "pregunta": "ANSI (American National Standards Institute) is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "35"
+    },
+    {
+      "pregunta": "IEC (International Electrotechnical Commission) is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "37"
+    },
+    {
+      "pregunta": "EIA (Electronic Industries Association) is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "39"
+    },
+    {
+      "pregunta": "Ways to contribute to standards development are?",
+      "respuetas": [
+        "The provision of updated international standards."
+      ],
+      "id": "41"
+    },
+    {
+      "pregunta": "Who is the author of this document?",
+      "respuesta": "Juan Enrique Garrido Navarro",
+      "id": "43"
+    }
+  ],
+  "teste23": [
+    {
+      "pregunta": "What is a standard?",
+      "respuesta": "V",
+      "id": "1"
+    },
+    {
+      "pregunta": "What is a standard? (ISO/IEC/IEEE 24765h:2019)",
+      "respuesta": "V",
+      "id": "3"
+    },
+    {
+      "pregunta": "What is a standard? (ISO/IEC TR 29110-1:2016)",
+      "respuesta": "V",
+      "id": "5"
+    },
+    {
+      "pregunta": "The ability to apply software development and maintenance methodologies and procedures of the highest professional level is a benefit of standards.",
+      "respuesta": "V",
+      "id": "7"
+    },
+    {
+      "pregunta": "Better mutual understanding and coordination among development teams is a benefit of standards.",
+      "respuesta": "V",
+      "id": "9"
+    },
+    {
+      "pregunta": "Greater cooperation with external participants in the project is a benefit of standards.",
+      "respuesta": "V",
+      "id": "11"
+    },
+    {
+      "pregunta": "Better understanding and cooperation between suppliers and customers is a benefit of standards.",
+      "respuesta": "V",
+      "id": "13"
+    },
+    {
+      "pregunta": "Do you know some standard?",
+      "respuesta": "F",
+      "id": "15"
+    },
+    {
+      "pregunta": "Environment management is a standard.",
+      "respuesta": "F",
+      "id": "17"
+    },
+    {
+      "pregunta": "Security is a standard.",
+      "respuesta": "F",
+      "id": "19"
+    },
+    {
+      "pregunta": "Information management is a standard.",
+      "respuesta": "F",
+      "id": "21"
+    },
+    {
+      "pregunta": "ISO/IEC 15948 is a standard.",
+      "respuesta": "V",
+      "id": "23"
+    },
+    {
+      "pregunta": "ISO 32000-1 is a standard.",
+      "respuesta": "V",
+      "id": "25"
+    },
+    {
+      "pregunta": "IEEE (Institute of Electrical and Electronics Engineers) Computer Society is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "27"
+    },
+    {
+      "pregunta": "ISO (International Organization for Standardization) is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "29"
+    },
+    {
+      "pregunta": "DOD (US Department of Defense) is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "31"
+    },
+    {
+      "pregunta": "ANSI (American National Standards Institute) is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "33"
+    },
+    {
+      "pregunta": "IEC (International Electrotechnical Commission) is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "35"
+    },
+    {
+      "pregunta": "EIA (Electronic Industries Association) is an organization involved in standards development.",
+      "respuesta": "V",
+      "id": "37"
+    },
+    {
+      "pregunta": "The provision of updated international standards is a way to contribute to standards development.",
+      "respuesta": "V",
+      "id": "39"
+    }
+  ],
+  "1111": [
+    {
+      "pregunta": "What is a standard?",
+      "respuesta": "V",
+      "id": "1"
+    },
+    {
+      "pregunta": "What is a standard? (ISO/IEC/IEEE 24765h:2019)",
+      "respuesta": "V",
+      "id": "3"
+    },
+    {
+      "pregunta": "What is a standard? (ISO/IEC TR 29110-1:2016)",
+      "respuesta": "V",
+      "id": "5"
+    },
+    {
+      "pregunta": "What are some benefits of using standards?",
+      "respuesta": "V",
+      "id": "7"
+    },
+    {
+      "pregunta": "What are some benefits of using standards for software development?",
+      "respuesta": "V",
+      "id": "9"
+    },
+    {
+      "pregunta": "What are some benefits of using standards for software development and maintenance? (twice)",
+      "respuesta": "F",
+      "id": "11"
+    },
+    {
+      "pregunta": "What are benefits of using standards for software development?",
+      "respuesta": "V",
+      "id": "13"
+    },
+    {
+      "pregunta": "What are some benefits of using standards for software development? Better mutual understanding and coordination among development teams.",
+      "respuesta": "V",
+      "id": "15"
+    },
+    {
+      "pregunta": "What are some benefits of using standards for software development? Greater cooperation with external participants in the project.",
+      "respuesta": "V",
+      "id": "17"
+    },
+    {
+      "pregunta": "What are some benefits of using standards for software development? Better understanding and cooperation between suppliers and customers, based on the adoption of known development and maintenance standards as part of the contract.",
+      "respuesta": "V",
+      "id": "19"
+    },
+    {
+      "pregunta": "Do you know some standard?",
+      "respuesta": "V",
+      "id": "21"
+    },
+    {
+      "pregunta": "Do you know some standard? (Environment management)",
+      "respuesta": "V",
+      "id": "23"
+    },
+    {
+      "pregunta": "Do you know some standard? (Security)",
+      "respuesta": "V",
+      "id": "25"
+    },
+    {
+      "pregunta": "Do you know some standard? (Information management)",
+      "respuesta": "V",
+      "id": "27"
+    },
+    {
+      "pregunta": "Do you know some standard? (Quality Management)",
+      "respuesta": "V",
+      "id": "29"
+    },
+    {
+      "pregunta": "Do you know some standard? (Software engineering)",
+      "respuesta": "V",
+      "id": "31"
+    },
+    {
+      "pregunta": "What are some organizations involved in standards development?",
+      "respuesta": "V",
+      "id": "33"
+    },
+    {
+      "pregunta": "What are some organizations involved in standards development? (IEEE)",
+      "respuesta": "V",
+      "id": "35"
+    },
+    {
+      "pregunta": "What are some organizations involved in standards development? (ISO)",
+      "respuesta": "V",
+      "id": "37"
+    },
+    {
+      "pregunta": "What are some organizations involved in standards development? (DOD)",
+      "respuesta": "V",
+      "id": "39"
+    },
+    {
+      "pregunta": "What are some organizations involved in standards development? (ANSI)",
+      "respuesta": "V",
+      "id": "41"
+    },
+    {
+      "pregunta": "What are some organizations involved in standards development? (IEC)",
+      "respuesta": "V",
+      "id": "43"
+    },
+    {
+      "pregunta": "What are some organizations involved in standards development? (EIA)",
+      "respuesta": "V",
+      "id": "45"
+    },
+    {
+      "pregunta": "What are ways to contribute to standards development?",
+      "respuesta": "V",
+      "id": "47"
+    },
+    {
+      "pregunta": "What are ways to contribute to standards development? (The provision of updated international standards)",
+      "respuesta": "V",
+      "id": "49"
+    }
+  ],
+  "teste24": [
+    {
+      "pregunta": "What is a standard?",
+      "respuesta": "V",
+      "id": "1"
+    },
+    {
+      "pregunta": "What is a standard? (ISO/IEC TR 29110-1:2016)",
+      "respuesta": "V",
+      "id": "3"
+    },
+    {
+      "pregunta": "What is a standard? (ISO/IEC/IEEE 24765h:2019)",
+      "respuesta": "V",
+      "id": "5"
+    },
+    {
+      "pregunta": "What are the benefits of using standards in software development and maintenance?",
+      "respuesta": "V",
+      "id": "7"
+    },
+    {
+      "pregunta": "What are the benefits of using standards in software development and maintenance? (better mutual understanding and coordination among development teams)",
+      "respuesta": "V",
+      "id": "9"
+    },
+    {
+      "pregunta": "What are the benefits of using standards in software development and maintenance? (greater cooperation with external participants in the project)",
+      "respuesta": "V",
+      "id": "11"
+    },
+    {
+      "pregunta": "What are the benefits of using standards in software development and maintenance? (better understanding and cooperation between suppliers and customers, based on the adoption of known development and maintenance standards as part of the contract)",
+      "respuesta": "V",
+      "id": "13"
+    },
+    {
+      "pregunta": "Do you know some standards?",
+      "respuesta": "V",
+      "id": "15"
+    },
+    {
+      "pregunta": "Do you know some standards related to environment management, security, or information management?",
+      "respuesta": "V",
+      "id": "17"
+    },
+    {
+      "pregunta": "Do you know some standards? (ISO/IEC 15948)",
+      "respuesta": "V",
+      "id": "19"
+    },
+    {
+      "pregunta": "Do you know some standards? (ISO 32000-1)",
+      "respuesta": "V",
+      "id": "21"
+    },
+    {
+      "pregunta": "Which organizations are involved in standards development? (IEEE)",
+      "respuesta": "V",
+      "id": "23"
+    },
+    {
+      "pregunta": "Which organizations are involved in standards development? (ISO)",
+      "respuesta": "V",
+      "id": "25"
+    },
+    {
+      "pregunta": "Which organizations are involved in standards development? (DOD)",
+      "respuesta": "V",
+      "id": "27"
+    },
+    {
+      "pregunta": "Which organizations are involved in standards development? (ANSI)",
+      "respuesta": "V",
+      "id": "29"
+    },
+    {
+      "pregunta": "Which organizations are involved in standards development? (IEC)",
+      "respuesta": "V",
+      "id": "31"
+    },
+    {
+      "pregunta": "Which organizations are involved in standards development? (EIA)",
+      "respuesta": "V",
+      "id": "33"
+    },
+    {
+      "pregunta": "How can you contribute to standards development? (The provision of updated international standards)",
+      "respuesta": "V",
+      "id": "35"
+    },
+    {
+      "pregunta": "What is the definition of a standard according to ISO/IEC TR 29110-1:2016?",
+      "respuesta": "V",
+      "id": "37"
+    },
+    {
+      "pregunta": "What is the definition of a standard according to ISO/IEC/IEEE 24765h:2019?",
+      "respuesta": "V",
+      "id": "39"
+    }
+  ],
+  "1234": [
+    {
+      "pregunta": "What is a standard?",
+      "respuesta": "V",
+      "id": "1"
+    },
+    {
+      "pregunta": "What is a standard?",
+      "respuesta": "V",
+      "id": "3"
+    },
+    {
+      "pregunta": "What is a standard as defined in ISO/IEC TR 29110-1:2016?",
+      "respuesta": "V",
+      "id": "5"
+    },
+    {
+      "pregunta": "What is a standard as defined in ISO/IEC/IEEE 24765h:2019?",
+      "respuesta": "V",
+      "id": "7"
+    },
+    {
+      "pregunta": "What are some benefits of using standards in software development and maintenance?",
+      "respuesta": "V",
+      "id": "9"
+    },
+    {
+      "pregunta": "What are some benefits of using standards in software development and maintenance? (Better mutual understanding and coordination among development teams)",
+      "respuesta": "V",
+      "id": "11"
+    },
+    {
+      "pregunta": "What are some benefits of using standards in software development and maintenance? (Greater cooperation with external participants in the project)",
+      "respuesta": "V",
+      "id": "13"
+    },
+    {
+      "pregunta": "What are some benefits of using standards in software development and maintenance? (Better understanding and cooperation between suppliers and customers, based on the adoption of known development and maintenance standards as part of the contract)",
+      "respuesta": "V",
+      "id": "15"
+    },
+    {
+      "pregunta": "Do you know some standards?",
+      "respuesta": "V",
+      "id": "17"
+    },
+    {
+      "pregunta": "Do you know some standards in the field of environment management?",
+      "respuesta": "F",
+      "id": "19"
+    },
+    {
+      "pregunta": "Do you know some standards in the field of security?",
+      "respuesta": "V",
+      "id": "21"
+    },
+    {
+      "pregunta": "Do you know some standards in the field of information management?",
+      "respuesta": "V",
+      "id": "23"
+    },
+    {
+      "pregunta": "Do you know some standard? (ISO/IEC 15948)",
+      "respuesta": "V",
+      "id": "25"
+    },
+    {
+      "pregunta": "Do you know some standard? (ISO 32000-1)",
+      "respuesta": "V",
+      "id": "27"
+    },
+    {
+      "pregunta": "Which organizations are involved in standards development? (IEEE (Institute of Electrical and Electronics Engineers) Computer Society)",
+      "respuesta": "V",
+      "id": "29"
+    },
+    {
+      "pregunta": "Which organizations are involved in standards development? (ISO (International Organization for Standardization))",
+      "respuesta": "V",
+      "id": "31"
+    },
+    {
+      "pregunta": "Which organizations are involved in standards development? (DOD (US Department of Defense))",
+      "respuesta": "V",
+      "id": "33"
+    },
+    {
+      "pregunta": "Which organizations are involved in standards development? (ANSI (American National Standards Institute))",
+      "respuesta": "V",
+      "id": "35"
+    },
+    {
+      "pregunta": "Which organizations are involved in standards development? (IEC (International Electrotechnical Commission))",
+      "respuesta": "V",
+      "id": "37"
+    },
+    {
+      "pregunta": "Which organizations are involved in standards development? (EIA (Electronic Industries Association))",
+      "respuesta": "V",
+      "id": "39"
+    },
+    {
+      "pregunta": "How can you contribute to standards development? (The provision of updated international standards)",
+      "respuesta": "V",
+      "id": "41"
+    }
+  ],
+  "topico_com_perguntas": [
+    {
+      "pregunta": "What is a standard?",
+      "respuesta": "V",
+      "id": "1"
+    },
+    {
+      "pregunta": "What is a standard as defined in ISO/IEC TR 29110-1:2016?",
+      "respuesta": "V",
+      "id": "3"
+    },
+    {
+      "pregunta": "What is a standard as defined in ISO/IEC/IEEE 24765h:2019?",
+      "respuesta": "V",
+      "id": "5"
+    },
+    {
+      "pregunta": "What are the benefits of using standards in software development and maintenance?",
+      "respuesta": "V",
+      "id": "7"
+    },
+    {
+      "pregunta": "What benefits come from better mutual understanding and coordination among development teams when using standards?",
+      "respuesta": "V",
+      "id": "9"
+    },
+    {
+      "pregunta": "What benefits come from greater cooperation with external participants in the project when using standards?",
+      "respuesta": "V",
+      "id": "11"
+    },
+    {
+      "pregunta": "What benefits come from better understanding and cooperation between suppliers and customers when using standards?",
+      "respuesta": "V",
+      "id": "13"
+    },
+    {
+      "pregunta": "Do you know some standards?",
+      "respuesta": "V",
+      "id": "15"
+    },
+    {
+      "pregunta": "Can you name some standards related to environment management or security?",
+      "respuesta": "V",
+      "id": "17"
+    },
+    {
+      "pregunta": "Can you name some standards related to information management?",
+      "respuesta": "V",
+      "id": "19"
+    },
+    {
+      "pregunta": "Which organizations are involved in standards development?",
+      "respuesta": "V",
+      "id": "21"
+    },
+    {
+      "pregunta": "Which organizations are involved in standards development, including the Institute of Electrical and Electronics Engineers (IEEE), the International Organization for Standardization (ISO), the US Department of Defense (DOD), the American National Standards Institute (ANSI), the International Electrotechnical Commission (IEC), and the Electronic Industries Association (EIA)?",
+      "respuesta": "V",
+      "id": "23"
+    },
+    {
+      "pregunta": "How can you contribute to standards development?",
+      "respuesta": "V",
+      "id": "25"
+    },
+    {
+      "pregunta": "What is one way to contribute to the provision of updated international standards?",
+      "respuesta": "V",
+      "id": "27"
+    },
+    {
+      "pregunta": "Which standard is related to software engineering lifecycle profiles for Very Small Entities (VSEs)?",
+      "respuesta": "ISO/IEC 15948",
+      "id": "29"
+    },
+    {
+      "pregunta": "Which standard is related to PDF files (Portable Document Format)?",
+      "respuesta": "ISO 32000-1",
+      "id": "31"
+    },
+    {
+      "pregunta": "Which standard is related to quality management and improvement?",
+      "respuesta": "N",
+      "id": "33"
+    }
   ]
 }

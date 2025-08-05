@@ -1,11 +1,15 @@
-# firebase_init.py
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, storage
 
-# Inicialize o Firebase com seu arquivo de credencial
 cred = credentials.Certificate("firebase_config.json")
-firebase_admin.initialize_app(cred)
+bucket_name = "oaiedu.firebasestorage.app"
 
-# Obtenha o cliente Firestore
+firebase_admin.initialize_app(cred, {
+    'storageBucket': bucket_name
+})
+
 db = firestore.client()
-SERVER_TIMESTAMP = firebase_admin.firestore.SERVER_TIMESTAMP  # Exporta constante
+
+bucket = storage.bucket()
+
+SERVER_TIMESTAMP = firebase_admin.firestore.SERVER_TIMESTAMP

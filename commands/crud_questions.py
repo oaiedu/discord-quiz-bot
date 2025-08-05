@@ -1,12 +1,7 @@
 from discord import app_commands, Interaction
 
-from repositories.question_repository import (
-    listar_perguntas_por_topico,
-    adicionar_pergunta,
-    deletar_pergunta
-)
-from repositories.topic_repository import obter_topics_para_autocompletar
-from utils.utils import actualizar_ultima_interaccion
+from repositories.question_repository import ( listar_perguntas_por_topico, adicionar_pergunta, deletar_pergunta )
+from utils.utils import actualizar_ultima_interaccion, obter_topics_para_autocompletar
 
 ROL_PROFESOR = "faculty"
 

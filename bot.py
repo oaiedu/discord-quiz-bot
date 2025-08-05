@@ -10,11 +10,11 @@ import logging
 
 from utils.llm_utils import generar_preguntas_desde_pdf
 from utils.keep_alive import keep_alive
-from utils.utils import registrar_user_estadistica
-from commands import crud_questions
+from utils.utils import registrar_user_estadistica, obter_topics_para_autocompletar
+from commands import crud_questions, crud_topics
 from repositories.server_repository import registrar_servidor, desativar_servidor, atualizar_ultima_interacao_servidor
 from repositories.user_repository import registrar_usuarios_servidor
-from repositories.topic_repository import obter_topics_por_servidor, obter_topics_para_autocompletar, obter_preguntas_por_topic
+from repositories.topic_repository import obter_topics_por_servidor, obter_preguntas_por_topic, save_topic_pdf
 from repositories import stats_repository
 
 load_dotenv()
@@ -40,6 +40,7 @@ class QuizBot(discord.Client):
 
 bot = QuizBot()
 crud_questions.register(bot.tree)
+crud_topics.register(bot.tree)
 
 
 @bot.event
@@ -73,45 +74,7 @@ async def estadisticas(interaction: discord.Interaction):
         logging.error(f"Erro ao obter estadísticas: {e}")
         await interaction.response.send_message("❌ Erro ao obter estadísticas.")
 
-@bot.tree.command(name="upload", description="Sube un PDF y genera preguntas automáticamente")
-@app_commands.describe(nombre_topico="Nombre del tema para guardar el PDF", archivo="Archivo PDF con el contenido")
-async def upload(interaction: discord.Interaction, nombre_topico: str, archivo: discord.Attachment):
-    atualizar_ultima_interacao_servidor(interaction.guild.id)
 
-    await interaction.response.defer(thinking=True)
-
-    if not archivo.filename.endswith(".pdf"):
-        await interaction.followup.send("❌ Solo se permiten archivos PDF.")
-        return
-
-    os.makedirs(RUTA_DOCS, exist_ok=True)
-    ruta_pdf = os.path.join(RUTA_DOCS, f"{nombre_topico}.pdf")
-    await archivo.save(ruta_pdf)
-
-    try:
-        guild_id = interaction.guild.id
-        generar_preguntas_desde_pdf(nombre_topico, guild_id)
-        await interaction.followup.send("🧠 Preguntas generadas correctamente desde el PDF.")
-    except Exception as e:
-        await interaction.followup.send(f"❌ Error al generar preguntas: {e}")
-
-
-@bot.tree.command(name="topics", description="Muestra los temas disponibles para hacer quizzes")
-async def topics(interaction: discord.Interaction):
-    atualizar_ultima_interacao_servidor(interaction.guild.id)
-
-    try:
-        temas_docs = obter_topics_por_servidor(interaction.guild.id)
-
-        if not temas_docs:
-            await interaction.response.send_message("❌ No hay temas disponibles todavía.")
-            return
-
-        temas = "\n".join(f"- {doc.to_dict().get('title', 'Sem título')}" for doc in temas_docs)
-        await interaction.response.send_message(f"📚 Temas disponibles:\n{temas}")
-    except Exception as e:
-        logging.error(f"Erro ao carregar tópicos: {e}")
-        await interaction.response.send_message("❌ Erro ao carregar os temas.")
 
 async def obtener_temas_autocompletado(interaction: discord.Interaction, current: str):
     temas = obter_topics_para_autocompletar(interaction.guild.id)
