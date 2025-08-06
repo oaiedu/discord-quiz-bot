@@ -1,49 +1,52 @@
 def prompt_multiple_choice(topico, texto, qty):
     return f"""
-    Você é um gerador de perguntas. Com base no conteúdo abaixo, gere {qty} perguntas de múltipla escolha.
-    Cada pergunta deve conter quatro alternativas (A, B, C, D) e indicar a correta com a letra.
-    Retorne em formato JSON como este:
-    [
-    {{
-        "pergunta": "...",
-        "alternativas": {{
-            "A": "...",
-            "B": "...",
-            "C": "...",
-            "D": "..."
-        }},
-        "resposta": "B"
+Você é um gerador de perguntas. Gere **exatamente {qty}** perguntas de múltipla escolha com base no conteúdo abaixo, e **não gere nenhuma pergunta extra**.
+
+Cada pergunta deve conter quatro alternativas (A, B, C, D), e apenas uma correta. A resposta correta deve ser indicada com a letra.
+
+Formato da saída em JSON:
+[
+{{
+    "pergunta": "Texto da pergunta...",
+    "alternativas": {{
+        "A": "Alternativa A",
+        "B": "Alternativa B",
+        "C": "Alternativa C",
+        "D": "Alternativa D"
     }},
-    ...
-    ]
+    "resposta": "B"
+}},
+...
+]  # Exatamente {qty} objetos como esse
 
-    Tema: {topico}
+Tema: {topico}
 
-    Conteúdo:
-    {texto[:4000]}  # Limite para evitar excesso de tokens
-    """
+Conteúdo:
+{texto[:4000]}
+"""
 
 def prompt_true_false(topico, texto, qty):
     return f"""
-    Você é um gerador de perguntas. Com base no conteúdo abaixo, gere {qty} perguntas de verdadeiro ou falso.
-    Retorne em formato JSON como este:
-    [
-    {{
-        "pergunta": "...",
-        "resposta": "V"
-    }},
-    ...
-    ]
+Você é um gerador de perguntas. Gere **exatamente {qty}** perguntas de verdadeiro ou falso com base no conteúdo abaixo, e **não gere nenhuma pergunta extra**.
 
-    Tema: {topico}
+Formato da saída em JSON:
+[
+{{
+    "pergunta": "Texto da pergunta...",
+    "resposta": "Verdadeiro"  # ou "Falso"
+}},
+...
+]  # Exatamente {qty} objetos como esse
 
-    Conteúdo:
-    {texto[:4000]}
-    """
+Tema: {topico}
+
+Conteúdo:
+{texto[:4000]}
+"""
 
 def prompt_short_answer(topico, texto, qty):
     return f"""
-    Você é um gerador de perguntas. Com base no conteúdo abaixo, gere {qty} perguntas de resposta curta.
+    Você é um gerador de perguntas. Com base no conteúdo abaixo, gere {qty} perguntas de resposta curta, e não gere nenhuma extra. Somente {qty}.
     Retorne em formato JSON como este:
     [
     {{
@@ -61,7 +64,7 @@ def prompt_short_answer(topico, texto, qty):
 
 def prompt_default(topico, texto, qty):
     return f"""
-    Você é um gerador de perguntas. Com base no conteúdo abaixo, gere {qty} perguntas variadas.
+    Você é um gerador de perguntas. Com base no conteúdo abaixo, gere {qty} perguntas variadas, e não gere nenhuma extra. Somente {qty}.
     Retorne em formato JSON como este:
     [
     {{

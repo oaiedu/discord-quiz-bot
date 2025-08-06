@@ -98,17 +98,28 @@ def register(tree: app_commands.CommandTree):
             await interaction.response.send_message("⛔ This command is for professors only.", ephemeral=True)
             return
         
-        guild_id = interaction.guild.id
-
         try:
+            await interaction.response.defer(thinking=True, ephemeral=True)
+            
+            guild_id = interaction.guild.id
+            
             topic = get_topic_by_name(guild_id, topic)
             
             topic_name = topic["title"]
             topic_id = topic["topic_id"]
             topic_storage_url = topic["document_storage_url"]
-            question_type = QuestionType(type)
+                    
+            str_to_enum = {
+                "Multiple Choice": QuestionType.MULTIPLE_CHOICE,
+                "True or False": QuestionType.TRUE_FALSE
+            }
+
+            if type not in str_to_enum:
+                raise ValueError(f"'{type}' is not a valid QuestionType")
+
+            question_type = str_to_enum[type]
             
             generar_preguntas_desde_pdf(topic_name, topic_id, guild_id, topic_storage_url, 50, question_type)
-            await interaction.response.send_message(f"🗑️ Deleted question with ID `{id}` from `{topic}`", ephemeral=True)
+            await interaction.followup.send(f"📭 Questions generated from `{topic_name}`", ephemeral=True)
         except Exception as e:
-            await interaction.response.send_message(f"❌ Failed to delete question: {e}", ephemeral=True)
+            await interaction.followup.send(f"❌ Failed to generate questions: {e}", ephemeral=True)

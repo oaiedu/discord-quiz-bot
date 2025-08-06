@@ -3,7 +3,6 @@ import random
 from discord import app_commands, Interaction
 import discord
 
-import bot
 from repositories.server_repository import atualizar_ultima_interacao_servidor
 from repositories.topic_repository import obter_preguntas_por_topic
 from utils.utils import obtener_temas_autocompletado, registrar_user_estadistica

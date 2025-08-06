@@ -6,7 +6,7 @@ def listar_topicos(guild_id):
              .collection("topics") \
              .get()
 
-def criar_topico_com_perguntas(guild_id, topico, topic_id, preguntas_novas, document_url):
+def criar_topico_com_perguntas(guild_id, topico, topic_id, preguntas_novas, document_url, qty, type):
     use_topic_id = None
     topic_ref = None
     
@@ -33,11 +33,12 @@ def criar_topico_com_perguntas(guild_id, topico, topic_id, preguntas_novas, docu
         pregunta_id = doc_ref.id
         batch.set(doc_ref, {
             "question_id": pregunta_id,
-            "question": pregunta.get("pregunta", ""),
-            "correct_answer": pregunta.get("respuesta", "V"),
-            "question_type": pregunta.get("question_type", "True or False"),
-            "success": pregunta.get("success", 0),
-            "failures": pregunta.get("failures", 0)
+            "question": pregunta.get("pergunta"),
+            "alternatives": pregunta.get("alternativas", ""),
+            "correct_answer": pregunta.get("resposta"),
+            "question_type": type.value,
+            "success": 0,
+            "failures": 0
         })
     batch.commit()
     return use_topic_id

@@ -43,11 +43,12 @@ def extract_text_from_pdf(pdf_url):
     
 def generar_prompt_perguntas(texto, topico, qty, type):
     switch = {
-        QuestionType.MULTIPLE_CHOICE: prompt_multiple_choice(topico, texto, qty),
-        QuestionType.TRUE_FALSE: prompt_true_false(topico, texto, qty),
+        QuestionType.MULTIPLE_CHOICE: prompt_multiple_choice,
+        QuestionType.TRUE_FALSE: prompt_true_false,
     }
 
-    return switch.get(type, prompt_default)()
+    prompt_fn = switch.get(type, prompt_default)
+    return prompt_fn(topico, texto, qty)
 
 def enviar_a_openrouter(prompt):
     try:
@@ -75,14 +76,16 @@ def enviar_a_openrouter(prompt):
         print("ERRO NO OPENROUTER", e)
 
 
-def guardar_preguntas_json(topic_name, topic_id, preguntas_str, guild_id, document_url):
+def guardar_preguntas_json(topic_name, topic_id, preguntas_str, guild_id, document_url, qty, type):
     try:
         preguntas_novas = json.loads(preguntas_str)
+        if isinstance(preguntas_novas, list):
+            preguntas_novas = preguntas_novas[:qty]
     except json.JSONDecodeError:
         print("⚠️ Error al parsear JSON generado. Verifica el output del modelo.")
         return
 
-    criar_topico_com_perguntas(guild_id, topic_name, topic_id, preguntas_novas, document_url)
+    criar_topico_com_perguntas(guild_id, topic_name, topic_id, preguntas_novas, document_url, qty, type)
 
     print(f"✅ {len(preguntas_novas)} preguntas guardadas en Firestore para el servidor {guild_id} y tópico '{topic_name}'")
 
@@ -107,4 +110,5 @@ def generar_preguntas_desde_pdf(topic_name, topic_id, guild_id, pdf_url, qty, ty
     texto = extract_text_from_pdf(pdf_url)
     prompt = generar_prompt_perguntas(texto, topic_name, qty, type)
     resultado = enviar_a_openrouter(prompt)
-    guardar_preguntas_json(topic_name, topic_id, resultado, guild_id, pdf_url)
+    guardar_preguntas_json(topic_name, topic_id, resultado, guild_id, pdf_url, qty, type)
+    
