@@ -4,18 +4,11 @@ import logging
 import os
 
 from repositories.topic_repository import criar_topico_sem_perguntas, obter_topics_por_servidor, save_topic_pdf
-from utils.utils import actualizar_ultima_interaccion
+from utils.enum import QuestionType
+from utils.utils import actualizar_ultima_interaccion, is_professor
 from utils.llm_utils import generar_preguntas_desde_pdf
 
-ROL_PROFESOR = "faculty"
 RUTA_DOCS = "docs"
-
-# Função auxiliar para verificar permissão
-def is_professor(interaction: Interaction) -> bool:
-    return interaction.guild and any(
-        role.name.lower() == ROL_PROFESOR.lower()
-        for role in interaction.user.roles
-    )
 
 # Função salvar pdf no storage
 async def save_pdf(interaction: Interaction, archivo: discord.Attachment, nombre_topico: str):
@@ -68,7 +61,7 @@ def register(tree: app_commands.CommandTree):
     ### 
     # SALVAR PDF NO STORAGE
     ###
-    @tree.command(name="add_topic_pdf", description="Salva o PDF para gerar preguntas de diferentes tipos")
+    @tree.command(name="upload_pdf", description="Salva o PDF sem gerar perguntas")
     @app_commands.describe(nombre_topico="Nombre del tema para guardar el PDF", archivo="Archivo PDF con el contenido")
     async def upload_pdf(interaction: discord.Interaction, nombre_topico: str, archivo: discord.Attachment):
         try:
@@ -102,7 +95,7 @@ def register(tree: app_commands.CommandTree):
 
         try:
             guild_id = interaction.guild.id
-            generar_preguntas_desde_pdf(nombre_topico, guild_id, pdf_url)
+            generar_preguntas_desde_pdf(nombre_topico, None, guild_id, pdf_url, 50, QuestionType.TRUE_FALSE)
             await interaction.followup.send("🧠 Preguntas generadas correctamente desde el PDF.")
         except Exception as e:
             await interaction.followup.send(f"❌ Error al generar preguntas: {e}")

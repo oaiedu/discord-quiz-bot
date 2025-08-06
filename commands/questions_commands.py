@@ -1,24 +1,10 @@
 from discord import app_commands, Interaction
 
 from repositories.question_repository import ( listar_perguntas_por_topico, adicionar_pergunta, deletar_pergunta )
-from utils.utils import actualizar_ultima_interaccion, obter_topics_para_autocompletar
-
-ROL_PROFESOR = "faculty"
-
-# Função auxiliar para verificar permissão
-def is_professor(interaction: Interaction) -> bool:
-    return interaction.guild and any(
-        role.name.lower() == ROL_PROFESOR.lower()
-        for role in interaction.user.roles
-    )
-
-# Autocompletar com base no Firestore
-async def obtener_temas_autocompletado(interaction: Interaction, current: str):
-    temas = obter_topics_para_autocompletar(interaction.guild.id)
-    return [
-        app_commands.Choice(name=tema, value=tema)
-        for tema in temas if current.lower() in tema.lower()
-    ][:25]
+from repositories.topic_repository import get_topic_by_name
+from utils.enum import QuestionType
+from utils.llm_utils import generar_preguntas_desde_pdf
+from utils.utils import actualizar_ultima_interaccion, autocomplete_question_type, is_professor, obtener_temas_autocompletado
 
 # Registro de comandos
 def register(tree: app_commands.CommandTree):
@@ -98,6 +84,31 @@ def register(tree: app_commands.CommandTree):
 
         try:
             deletar_pergunta(interaction.guild.id, topic, id)
+            await interaction.response.send_message(f"🗑️ Deleted question with ID `{id}` from `{topic}`", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Failed to delete question: {e}", ephemeral=True)
+            
+    @tree.command(name="generate_questions", description="Generate multiple questions for a topic (Professors only)")
+    @app_commands.describe(topic="Topic name", qty="Quantity of new questions", type="Type os questions")
+    @app_commands.autocomplete(topic=obtener_temas_autocompletado, type=autocomplete_question_type)
+    async def generate_questions(interaction: Interaction, topic: str, qty: int, type: str):
+        actualizar_ultima_interaccion(interaction.guild.id)
+
+        if not is_professor(interaction):
+            await interaction.response.send_message("⛔ This command is for professors only.", ephemeral=True)
+            return
+        
+        guild_id = interaction.guild.id
+
+        try:
+            topic = get_topic_by_name(guild_id, topic)
+            
+            topic_name = topic["title"]
+            topic_id = topic["topic_id"]
+            topic_storage_url = topic["document_storage_url"]
+            question_type = QuestionType(type)
+            
+            generar_preguntas_desde_pdf(topic_name, topic_id, guild_id, topic_storage_url, 50, question_type)
             await interaction.response.send_message(f"🗑️ Deleted question with ID `{id}` from `{topic}`", ephemeral=True)
         except Exception as e:
             await interaction.response.send_message(f"❌ Failed to delete question: {e}", ephemeral=True)

@@ -1,12 +1,13 @@
-from firebase_init import db, SERVER_TIMESTAMP  # certifique-se que isso está no topo
+from firebase_init import db, SERVER_TIMESTAMP
 import os
 from dotenv import load_dotenv
 import json
-import fitz  # PyMuPDF
+import fitz
 import requests
-import uuid  # Adicione esta importação ao topo do arquivo
 from google.cloud import storage
 from repositories.topic_repository import criar_topico_com_perguntas
+from utils.enum import QuestionType
+from utils.prompts import prompt_default, prompt_multiple_choice, prompt_short_answer, prompt_true_false
 
 load_dotenv()
 
@@ -26,36 +27,27 @@ def extract_text_from_pdf(pdf_url):
 
     return text
 
+# def subir_a_gcs(nombre_archivo_local, nombre_bucket, nombre_destino):
+#     client = storage.Client()
+#     bucket = client.bucket(nombre_bucket)
+#     blob = bucket.blob(nombre_destino)
+#     blob.upload_from_filename(nombre_archivo_local)
+#     print(f"✅ {nombre_archivo_local} subido a gs://{nombre_bucket}/{nombre_destino}")
 
-def subir_a_gcs(nombre_archivo_local, nombre_bucket, nombre_destino):
-    client = storage.Client()
-    bucket = client.bucket(nombre_bucket)
-    blob = bucket.blob(nombre_destino)
-    blob.upload_from_filename(nombre_archivo_local)
-    print(f"✅ {nombre_archivo_local} subido a gs://{nombre_bucket}/{nombre_destino}")
+# def descargar_de_gcs(nombre_remoto, nombre_bucket, nombre_local):
+#     client = storage.Client()
+#     bucket = client.bucket(nombre_bucket)
+#     blob = bucket.blob(nombre_remoto)
+#     blob.download_to_filename(nombre_local)
+#     print(f"✅ {nombre_remoto} descargado de gs://{nombre_bucket} a {nombre_local}")
+    
+def generar_prompt_perguntas(texto, topico, qty, type):
+    switch = {
+        QuestionType.MULTIPLE_CHOICE: prompt_multiple_choice(topico, texto, qty),
+        QuestionType.TRUE_FALSE: prompt_true_false(topico, texto, qty),
+    }
 
-def descargar_de_gcs(nombre_remoto, nombre_bucket, nombre_local):
-    client = storage.Client()
-    bucket = client.bucket(nombre_bucket)
-    blob = bucket.blob(nombre_remoto)
-    blob.download_to_filename(nombre_local)
-    print(f"✅ {nombre_remoto} descargado de gs://{nombre_bucket} a {nombre_local}")
-
-def generar_prompt(texto, topico):
-    return f"""
-        Eres un generador de preguntas. Basándote en el siguiente contenido, genera 50 preguntas de verdadero o falso.
-        Devuélvelas en formato JSON como este:
-        [
-        {{ "pregunta": "...", "respuesta": "V" }},
-        ...
-        ]
-
-        Tema: {topico}
-
-        Contenido:
-        {texto[:4000]}  # limitamos para tokens, ajustable
-    """
-
+    return switch.get(type, prompt_default)()
 
 def enviar_a_openrouter(prompt):
     try:
@@ -83,16 +75,16 @@ def enviar_a_openrouter(prompt):
         print("ERRO NO OPENROUTER", e)
 
 
-def guardar_preguntas_json(topico, preguntas_str, guild_id, document_url):
+def guardar_preguntas_json(topic_name, topic_id, preguntas_str, guild_id, document_url):
     try:
         preguntas_novas = json.loads(preguntas_str)
     except json.JSONDecodeError:
         print("⚠️ Error al parsear JSON generado. Verifica el output del modelo.")
         return
 
-    criar_topico_com_perguntas(guild_id, topico, preguntas_novas, document_url)
+    criar_topico_com_perguntas(guild_id, topic_name, topic_id, preguntas_novas, document_url)
 
-    print(f"✅ {len(preguntas_novas)} preguntas guardadas en Firestore para el servidor {guild_id} y tópico '{topico}'")
+    print(f"✅ {len(preguntas_novas)} preguntas guardadas en Firestore para el servidor {guild_id} y tópico '{topic_name}'")
 
     if os.path.exists("preguntas.json"):
         with open("preguntas.json", "r", encoding="utf-8") as f:
@@ -100,19 +92,19 @@ def guardar_preguntas_json(topico, preguntas_str, guild_id, document_url):
     else:
         data = {}
 
-    if topico not in data:
-        data[topico] = []
+    if topic_name not in data:
+        data[topic_name] = []
 
     for i, pregunta in enumerate(preguntas_novas, start=1):
-        pregunta["id"] = str(len(data[topico]) + i)
-        data[topico].append(pregunta)
+        pregunta["id"] = str(len(data[topic_name]) + i)
+        data[topic_name].append(pregunta)
 
     with open("preguntas.json", "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-def generar_preguntas_desde_pdf(topico, guild_id, pdf_url):
+def generar_preguntas_desde_pdf(topic_name, topic_id, guild_id, pdf_url, qty, type):
     texto = extract_text_from_pdf(pdf_url)
-    prompt = generar_prompt(texto, topico)
+    prompt = generar_prompt_perguntas(texto, topic_name, qty, type)
     resultado = enviar_a_openrouter(prompt)
-    guardar_preguntas_json(topico, resultado, guild_id, pdf_url)
+    guardar_preguntas_json(topic_name, topic_id, resultado, guild_id, pdf_url)
