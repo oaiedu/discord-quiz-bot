@@ -1,7 +1,8 @@
 from firebase_init import db, SERVER_TIMESTAMP
+import logging
 
-def guardar_estadistica(usuario, topico, correctas, total):
-    return db.collection("estadisticas").add({
+def guardar_estadistica(guild_id, usuario, topico, correctas, total):
+    return db.collection("servers").document(str(guild_id)).collection("stats").add({
         "usuario_id": str(usuario.id),
         "nombre": usuario.name,
         "tema": topico,

@@ -1,3 +1,4 @@
+from typing import List
 from firebase_init import db, SERVER_TIMESTAMP
 import logging
 from firebase_admin import firestore
@@ -21,14 +22,13 @@ def registrar_usuarios_servidor(guild):
         })
     return batch.commit()
 
-def registrar_historico_usuario(user_id: int, guild_id: int, user_name: str, topic_id: str, acertos: int, total: int):
+def registrar_historico_usuario(user_id: int, guild_id: int, user_name: str, topic_id: str, acertos: int, total: int, types: List[str]):
     try:
         user_doc_ref = db.collection("servers") \
                          .document(str(guild_id)) \
                          .collection("users") \
                          .document(str(user_id))
 
-        # Timestamp UTC atual
         now_utc = datetime.now(tz=pytz.UTC)
 
         user_doc_ref.update({
@@ -36,7 +36,7 @@ def registrar_historico_usuario(user_id: int, guild_id: int, user_name: str, top
                 "date": now_utc,
                 "failures": total - acertos,
                 "success": acertos,
-                "type": "true_false_quiz",
+                "type": types,
                 "topic_id": topic_id
             }])
         })

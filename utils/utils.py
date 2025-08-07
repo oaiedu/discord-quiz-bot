@@ -1,6 +1,7 @@
 # utils/utils.py
 import discord
 from discord import Interaction, app_commands
+from typing import List, Union
 
 from repositories.topic_repository import obter_topics_por_servidor
 from repositories.user_repository import registrar_historico_usuario
@@ -39,12 +40,15 @@ async def autocomplete_question_type(
         if current.lower() in qt.name.lower()
     ]
 
-def registrar_user_estadistica(user: discord.User, topic_id: str, aciertos: int, total: int):
+def registrar_user_estadistica(user: discord.User, topic_id: str, aciertos: int, total: int, types: Union[str, List[str]]):
+    if isinstance(types, str):
+        types = [types]
     registrar_historico_usuario(
         user_id=user.id,
         guild_id=user.guild.id,
         user_name=user.name,
         topic_id=topic_id,
         acertos=aciertos,
-        total=total
+        total=total,
+        types=types,
     )
