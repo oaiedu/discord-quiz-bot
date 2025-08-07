@@ -9,7 +9,7 @@ firebase_admin.initialize_app(cred, {
 })
 
 db = firestore.client()
-
 bucket = storage.bucket()
 
-SERVER_TIMESTAMP = firebase_admin.firestore.SERVER_TIMESTAMP
+SERVER_TIMESTAMP = firestore.SERVER_TIMESTAMP
+Increment = firestore.Increment

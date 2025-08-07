@@ -10,11 +10,11 @@ from utils.llm_utils import generar_preguntas_desde_pdf
 
 RUTA_DOCS = "docs"
 
-# Função salvar pdf no storage
+# Function to save PDF to storage
 async def save_pdf(interaction: Interaction, archivo: discord.Attachment, nombre_topico: str):
     try:
         if not archivo.filename.endswith(".pdf"):
-            await interaction.followup.send("❌ Solo se permiten archivos PDF.")
+            await interaction.followup.send("❌ Only PDF files are allowed.")
             return
 
         os.makedirs(RUTA_DOCS, exist_ok=True)
@@ -25,7 +25,7 @@ async def save_pdf(interaction: Interaction, archivo: discord.Attachment, nombre
         print(pdf_url)
         
         if not pdf_url:
-            await interaction.response.send_message("❌ No hay temas disponibles todavía.") 
+            await interaction.response.send_message("❌ No topics available yet.") 
         
         if os.path.exists(ruta_pdf):
             os.remove(ruta_pdf)
@@ -33,15 +33,15 @@ async def save_pdf(interaction: Interaction, archivo: discord.Attachment, nombre
         return pdf_url
             
     except Exception as e:
-        logging.error(f"Erro ao carregar tópicos: {e}")
+        logging.error(f"Error loading topics: {e}")
         
 
 def register(tree: app_commands.CommandTree):
     
     ### 
-    # EXIBIR TODOS OS TÓPICOS 
+    # SHOW ALL TOPICS
     ###
-    @tree.command(name="topics", description="Muestra los temas disponibles para hacer quizzes")
+    @tree.command(name="topics", description="Displays the available topics for quizzes")
     async def list_topics(interaction: discord.Interaction):
         actualizar_ultima_interaccion(interaction.guild.id)
 
@@ -49,20 +49,20 @@ def register(tree: app_commands.CommandTree):
             temas_docs = obter_topics_por_servidor(interaction.guild.id)
 
             if not temas_docs:
-                await interaction.response.send_message("❌ No hay temas disponibles todavía.")
+                await interaction.response.send_message("❌ No topics available yet.")
                 return
 
-            temas = "\n".join(f"- {doc.to_dict().get('title', 'Sem título')}" for doc in temas_docs)
-            await interaction.response.send_message(f"📚 Temas disponibles:\n{temas}")
+            temas = "\n".join(f"- {doc.to_dict().get('title', 'Untitled')}" for doc in temas_docs)
+            await interaction.response.send_message(f"📚 Available topics:\n{temas}")
         except Exception as e:
-            logging.error(f"Erro ao carregar tópicos: {e}")
-            await interaction.response.send_message("❌ Erro ao carregar os temas.")
+            logging.error(f"Error loading topics: {e}")
+            await interaction.response.send_message("❌ Error loading topics.")
 
     ### 
-    # SALVAR PDF NO STORAGE
+    # SAVE PDF TO STORAGE
     ###
-    @tree.command(name="upload_pdf", description="Salva o PDF sem gerar perguntas")
-    @app_commands.describe(nombre_topico="Nombre del tema para guardar el PDF", archivo="Archivo PDF con el contenido")
+    @tree.command(name="upload_pdf", description="Saves the PDF without generating questions")
+    @app_commands.describe(nombre_topico="Name of the topic to save the PDF under", archivo="PDF file with content")
     async def upload_pdf(interaction: discord.Interaction, nombre_topico: str, archivo: discord.Attachment):
         try:
             actualizar_ultima_interaccion(interaction.guild.id)
@@ -74,18 +74,18 @@ def register(tree: app_commands.CommandTree):
             try:
                 guild_id = interaction.guild.id
                 criar_topico_sem_perguntas(guild_id, nombre_topico, pdf_url)
-                await interaction.followup.send("🧠 Topico criado com sucesso, mas sem perguntas")
+                await interaction.followup.send("🧠 Topic created successfully, but without questions.")
             except Exception as e:
-                await interaction.followup.send(f"❌ Error al generar preguntas: {e}")
+                await interaction.followup.send(f"❌ Error generating questions: {e}")
         except Exception as e:
-            logging.error(f"Erro ao carregar tópicos: {e}")
-            await interaction.response.send_message("❌ Erro ao carregar os temas.")
+            logging.error(f"Error loading topics: {e}")
+            await interaction.response.send_message("❌ Error loading topics.")
             
     ###
-    # SALVAR PDF E GERAR PERGUNTAS AUTOMATICAMENTE
+    # SAVE PDF AND GENERATE QUESTIONS AUTOMATICALLY
     ###        
-    @tree.command(name="upload_topic", description="Sube un PDF y genera preguntas automáticamente")
-    @app_commands.describe(nombre_topico="Nombre del tema para guardar el PDF", archivo="Archivo PDF con el contenido")
+    @tree.command(name="upload_topic", description="Uploads a PDF and automatically generates questions")
+    @app_commands.describe(nombre_topico="Name of the topic to save the PDF under", archivo="PDF file with content")
     async def upload_pdf_with_questions(interaction: discord.Interaction, nombre_topico: str, archivo: discord.Attachment):
         actualizar_ultima_interaccion(interaction.guild.id)
 
@@ -96,6 +96,6 @@ def register(tree: app_commands.CommandTree):
         try:
             guild_id = interaction.guild.id
             generar_preguntas_desde_pdf(nombre_topico, None, guild_id, pdf_url, 50, QuestionType.TRUE_FALSE)
-            await interaction.followup.send("🧠 Preguntas generadas correctamente desde el PDF.")
+            await interaction.followup.send("🧠 Questions successfully generated from the PDF.")
         except Exception as e:
-            await interaction.followup.send(f"❌ Error al generar preguntas: {e}")
+            await interaction.followup.send(f"❌ Error generating questions: {e}")

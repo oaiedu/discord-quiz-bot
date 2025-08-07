@@ -27,7 +27,7 @@ class QuizBot(discord.Client):
 
     async def setup_hook(self):
         await self.tree.sync()
-        print("\U0001F310 Slash commands sincronizados.")
+        print("\U0001F310 Slash commands synchronized.")
 
 
 bot = QuizBot()
@@ -39,17 +39,17 @@ stats_commands.register(bot.tree)
 
 @bot.event
 async def on_ready():
-    print(f"\u2705 Bot conectado como {bot.user}")
+    print(f"\u2705 Bot connected as {bot.user}")
     
 @bot.event
 async def on_guild_join(guild: discord.Guild):
-    logging.info(f"🆕 Bot adicionado ao servidor: {guild.name} (ID: {guild.id})")
+    logging.info(f"🆕 Bot added to server: {guild.name} (ID: {guild.id})")
     try:
         registrar_servidor(guild)
         registrar_usuarios_servidor(guild)
-        logging.info(f"📌 Servidor e usuários registrados no Firestore: {guild.id}")
+        logging.info(f"📌 Server and users registered in Firestore: {guild.id}")
     except Exception as e:
-        logging.error(f"❌ Erro ao registrar servidor ou usuários no Firestore: {e}")
+        logging.error(f"❌ Error registering server or users in Firestore: {e}")
 
     canal = discord.utils.find(
         lambda c: c.permissions_for(guild.me).send_messages and isinstance(c, discord.TextChannel),
@@ -58,44 +58,44 @@ async def on_guild_join(guild: discord.Guild):
 
     if canal:
         await canal.send(
-            "👋 ¡Hola! Gracias por añadirme a este servidor.\n"
-            "Usa `/help` para ver cómo puedo ayudarte com quizzes de verdadero o falso. 🎓"
+            "👋 Hello! Thanks for adding me to this server.\n"
+            "Use `/help` to see how I can assist you with true or false quizzes. 🎓"
         )
 
 @bot.event
 async def on_guild_remove(guild: discord.Guild):
-    print(f"🔌 Bot removido do servidor: {guild.name} ({guild.id})")
+    print(f"🔌 Bot removed from server: {guild.name} ({guild.id})")
     try:
         desativar_servidor(guild.id)
     except Exception as e:
-        print(f"❌ Erro ao atualizar status do servidor {guild.id}: {e}")
+        print(f"❌ Error updating server status {guild.id}: {e}")
 
 
-@bot.tree.command(name="help", description="Explica cómo usar el bot y sus comandos disponibles")
+@bot.tree.command(name="help", description="Explains how to use the bot and its available commands")
 async def help_command(interaction: discord.Interaction):
     atualizar_ultima_interacao_servidor(interaction.guild.id)
     await interaction.response.defer(thinking=True, ephemeral=True)
 
     if is_professor:
         mensaje = (
-            "📘 **Guía para profesores**\n\n"
-            "👉 `/quiz <tema>` — Lanza un quiz de 5 preguntas de verdadero o falso.\n"
-            "👉 `/topics` — Lista los temas disponibles para practicar.\n"
-            "👉 `/upload <tema>` — Sube un PDF para generar nuevas preguntas.\n"
-            "👉 `/stats` — Consulta los resultados de todos los estudiantes.\n"
-            "👉 `/add_question`, `/list_questions`, `/delete_question` — Gestión manual de preguntas.\n\n"
-            "💬 Para responder un quiz, contesta con una secuencia como `VFVFV`.\n"
-            "⏱️ Tienes 60 segundos para responder cada quiz.\n"
-            "🧠 ¡Buena práctica!"
+            "📘 **Guide for Professors**\n\n"
+            "👉 `/quiz <topic>` — Launch a 5-question true or false quiz.\n"
+            "👉 `/topics` — List the available topics to practice.\n"
+            "👉 `/upload <topic>` — Upload a PDF to generate new questions.\n"
+            "👉 `/stats` — View the results of all students.\n"
+            "👉 `/add_question`, `/list_questions`, `/delete_question` — Manage questions manually.\n\n"
+            "💬 To answer a quiz, respond with a sequence like `TFTFT`.\n"
+            "⏱️ You have 60 seconds to answer each quiz.\n"
+            "🧠 Happy practicing!"
         )
     else:
         mensaje = (
-            "📘 **Guía para estudiantes**\n\n"
-            "👉 `/quiz <tema>` — Lanza un quiz de 5 preguntas de verdadero o falso.\n"
-            "👉 `/topics` — Lista los temas disponibles para practicar.\n\n"
-            "💬 Para responder un quiz, contesta con una secuencia como `VFVFV`.\n"
-            "⏱️ Tienes 60 segundos para responder cada quiz.\n"
-            "🧠 ¡Buena práctica!"
+            "📘 **Guide for Students**\n\n"
+            "👉 `/quiz <topic>` — Launch a 5-question true or false quiz.\n"
+            "👉 `/topics` — List the available topics to practice.\n\n"
+            "💬 To answer a quiz, respond with a sequence like `TFTFT`.\n"
+            "⏱️ You have 60 seconds to answer each quiz.\n"
+            "🧠 Happy practicing!"
         )
 
     await interaction.followup.send(mensaje, ephemeral=True)

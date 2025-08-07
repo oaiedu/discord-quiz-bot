@@ -1,4 +1,4 @@
-from firebase_init import db
+from firebase_init import db, Increment
 
 def listar_perguntas_por_topico(guild_id: int, topic: str):
     topic_ref = db.collection("servers") \
@@ -47,3 +47,21 @@ def deletar_pergunta(guild_id: int, topic: str, question_id: str):
 
     pergunta_ref = topic_ref[0].reference.collection("questions").document(question_id)
     pergunta_ref.delete()
+    
+def update_question_stats(guild_id: int, topic_id: str, question_id: str, correct: bool):
+    topic_ref = db.collection("servers") \
+        .document(str(guild_id)) \
+        .collection("topics") \
+        .document(topic_id) \
+        .collection("questions") \
+        .document(question_id)
+
+    if correct:
+        topic_ref.update({
+            "success": Increment(1)
+        })
+    else:
+        topic_ref.update({
+            "failures": Increment(1)
+        })
+        
