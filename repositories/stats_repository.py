@@ -2,14 +2,18 @@ from firebase_init import db, SERVER_TIMESTAMP
 import logging
 
 def guardar_estadistica(guild_id, usuario, topico, correctas, total):
-    return db.collection("servers").document(str(guild_id)).collection("stats").add({
-        "usuario_id": str(usuario.id),
-        "nombre": usuario.name,
-        "tema": topico,
-        "correctas": correctas,
-        "total": total,
-        "timestamp": SERVER_TIMESTAMP
-    })
+    try:
+        db.collection("servers").document(str(guild_id)).collection("stats").add({
+            "usuario_id": str(usuario.id),
+            "nombre": usuario.name,
+            "tema": topico,
+            "correctas": correctas,
+            "total": total,
+            "timestamp": SERVER_TIMESTAMP
+        })
+        logging.info(f"✅ Estatística guardada para usuário {usuario.id} no servidor {guild_id}")
+    except Exception as e:
+        logging.error(f"❌ Erro ao guardar estatística para usuário {usuario.id} no servidor {guild_id}: {e}")
 
 def obter_estatisticas_por_servidor(guild_id: int):
     """
@@ -38,5 +42,5 @@ def obter_estatisticas_por_servidor(guild_id: int):
         return datos
 
     except Exception as e:
-        logging.error(f"Erro ao obter estadísticas para o servidor {guild_id}: {e}")
+        logging.error(f"❌ Erro ao obter estadísticas para o servidor {guild_id}: {e}")
         return {}

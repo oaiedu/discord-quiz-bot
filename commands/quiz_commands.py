@@ -45,10 +45,10 @@ def register(tree: app_commands.CommandTree):
     @app_commands.describe(nombre_topico="Topic name")
     @app_commands.autocomplete(nombre_topico=obtener_temas_autocompletado)
     async def quiz(interaction: discord.Interaction, nombre_topico: str):
-        if interaction.guild:
-            atualizar_ultima_interacao_servidor(interaction.guild.id)
-
         try:
+            if interaction.guild:
+                atualizar_ultima_interacao_servidor(interaction.guild.id)
+
             preguntas_data = obter_preguntas_por_topic(interaction.guild.id, nombre_topico)
 
             if not preguntas_data:

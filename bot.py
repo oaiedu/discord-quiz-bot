@@ -89,32 +89,37 @@ async def on_guild_remove(guild: discord.Guild):
 
 @bot.tree.command(name="help", description="Explains how to use the bot and its available commands")
 async def help_command(interaction: discord.Interaction):
-    atualizar_ultima_interacao_servidor(interaction.guild.id)
-    await interaction.response.defer(thinking=True, ephemeral=True)
+    try:
+        atualizar_ultima_interacao_servidor(interaction.guild.id)
+        await interaction.response.defer(thinking=True, ephemeral=True)
 
-    if is_professor:
-        mensaje = (
-            "📘 **Guide for Professors**\n\n"
-            "👉 `/quiz <topic>` — Launch a 5-question true or false quiz.\n"
-            "👉 `/topics` — List the available topics to practice.\n"
-            "👉 `/upload <topic>` — Upload a PDF to generate new questions.\n"
-            "👉 `/stats` — View the results of all students.\n"
-            "👉 `/add_question`, `/list_questions`, `/delete_question` — Manage questions manually.\n\n"
-            "💬 To answer a quiz, respond with a sequence like `TFTFT`.\n"
-            "⏱️ You have 60 seconds to answer each quiz.\n"
-            "🧠 Happy practicing!"
-        )
-    else:
-        mensaje = (
-            "📘 **Guide for Students**\n\n"
-            "👉 `/quiz <topic>` — Launch a 5-question true or false quiz.\n"
-            "👉 `/topics` — List the available topics to practice.\n\n"
-            "💬 To answer a quiz, respond with a sequence like `TFTFT`.\n"
-            "⏱️ You have 60 seconds to answer each quiz.\n"
-            "🧠 Happy practicing!"
-        )
+        if is_professor(interaction):
+            mensaje = (
+                "📘 **Guide for Professors**\n\n"
+                "👉 `/quiz <topic>` — Launch a 5-question true or false quiz.\n"
+                "👉 `/topics` — List the available topics to practice.\n"
+                "👉 `/upload <topic>` — Upload a PDF to generate new questions.\n"
+                "👉 `/stats` — View the results of all students.\n"
+                "👉 `/add_question`, `/list_questions`, `/delete_question` — Manage questions manually.\n\n"
+                "💬 To answer a quiz, respond with a sequence like `TFTFT`.\n"
+                "⏱️ You have 60 seconds to answer each quiz.\n"
+                "🧠 Happy practicing!"
+            )
+        else:
+            mensaje = (
+                "📘 **Guide for Students**\n\n"
+                "👉 `/quiz <topic>` — Launch a 5-question true or false quiz.\n"
+                "👉 `/topics` — List the available topics to practice.\n\n"
+                "💬 To answer a quiz, respond with a sequence like `TFTFT`.\n"
+                "⏱️ You have 60 seconds to answer each quiz.\n"
+                "🧠 Happy practicing!"
+            )
 
-    await interaction.followup.send(mensaje, ephemeral=True)
+        await interaction.followup.send(mensaje, ephemeral=True)
+    except Exception as e:
+        logging.error(f"Error calling help: {e}")
+        await interaction.response.send_message("❌ Error calling help.")
+        
 
 
 keep_alive()
