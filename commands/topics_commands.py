@@ -13,6 +13,11 @@ RUTA_DOCS = "docs"
 # Function to save PDF to storage
 async def save_pdf(interaction: Interaction, archivo: discord.Attachment, nombre_topico: str):
     try:
+                        
+        if not is_professor(interaction):
+            await interaction.response.send_message("\u26d4 This command is only available to professors.", ephemeral=True)
+            return
+        
         if not archivo.filename.endswith(".pdf"):
             await interaction.followup.send("❌ Only PDF files are allowed.")
             return
@@ -43,9 +48,14 @@ def register(tree: app_commands.CommandTree):
     ###
     @tree.command(name="topics", description="Displays the available topics for quizzes")
     async def list_topics(interaction: discord.Interaction):
-        actualizar_ultima_interaccion(interaction.guild.id)
-
         try:
+            
+            actualizar_ultima_interaccion(interaction.guild.id)
+            
+            if not is_professor(interaction):
+                await interaction.response.send_message("\u26d4 This command is only available to professors.", ephemeral=True)
+                return
+
             temas_docs = obter_topics_por_servidor(interaction.guild.id)
 
             if not temas_docs:
@@ -67,6 +77,10 @@ def register(tree: app_commands.CommandTree):
         try:
             actualizar_ultima_interaccion(interaction.guild.id)
 
+            if not is_professor(interaction):
+                await interaction.response.send_message("\u26d4 This command is only available to professors.", ephemeral=True)
+                return
+
             await interaction.response.defer(thinking=True)
             
             pdf_url = await save_pdf(interaction, archivo, nombre_topico)
@@ -87,13 +101,17 @@ def register(tree: app_commands.CommandTree):
     @tree.command(name="upload_topic", description="Uploads a PDF and automatically generates questions")
     @app_commands.describe(nombre_topico="Name of the topic to save the PDF under", archivo="PDF file with content")
     async def upload_pdf_with_questions(interaction: discord.Interaction, nombre_topico: str, archivo: discord.Attachment):
-        actualizar_ultima_interaccion(interaction.guild.id)
-
-        await interaction.response.defer(thinking=True)
-
-        pdf_url = await save_pdf(interaction, archivo, nombre_topico)
-
         try:
+            actualizar_ultima_interaccion(interaction.guild.id)
+        
+            if not is_professor(interaction):
+                await interaction.response.send_message("\u26d4 This command is only available to professors.", ephemeral=True)
+                return
+
+            await interaction.response.defer(thinking=True)
+
+            pdf_url = await save_pdf(interaction, archivo, nombre_topico)
+
             guild_id = interaction.guild.id
             generar_preguntas_desde_pdf(nombre_topico, None, guild_id, pdf_url, 50, QuestionType.TRUE_FALSE)
             await interaction.followup.send("🧠 Questions successfully generated from the PDF.")

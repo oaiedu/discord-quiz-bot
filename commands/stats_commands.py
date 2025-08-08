@@ -13,13 +13,13 @@ def register(tree: app_commands.CommandTree):
     
     @tree.command(name="stats", description="Shows a summary of the quizzes taken by all users (professors only)")
     async def estadisticas(interaction: discord.Interaction):
-        atualizar_ultima_interacao_servidor(interaction.guild.id)
-
-        if not is_professor(interaction):
-            await interaction.response.send_message("\u26d4 This command is only available to professors.", ephemeral=True)
-            return
-
         try:
+            atualizar_ultima_interacao_servidor(interaction.guild.id)
+
+            if not is_professor(interaction):
+                await interaction.response.send_message("\u26d4 This command is only available to professors.", ephemeral=True)
+                return
+
             datos = stats_repository.obter_estatisticas_por_servidor(interaction.guild.id)
 
             if not datos:
@@ -39,13 +39,13 @@ def register(tree: app_commands.CommandTree):
             
     @tree.command(name="user_stats", description="Shows a summary of the quizzes taken by all users (professors only)")
     async def user_stats(interaction: discord.Interaction):
-        atualizar_ultima_interacao_servidor(interaction.guild.id)
-
-        if not is_professor(interaction):
-            await interaction.response.send_message("⛔ This command is only available to professors.", ephemeral=True)
-            return
-
         try:
+            atualizar_ultima_interacao_servidor(interaction.guild.id)
+
+            if not is_professor(interaction):
+                await interaction.response.send_message("⛔ This command is only available to professors.", ephemeral=True)
+                return
+
             dados = stats_repository.obter_estatisticas_por_servidor(interaction.guild.id)
 
             if not dados:
@@ -117,13 +117,13 @@ def register(tree: app_commands.CommandTree):
             
     @tree.command(name="time_stats", description="Shows a summary of the quizzes taken by all users (professors only)")
     async def time_stats(interaction: discord.Interaction):
-        atualizar_ultima_interacao_servidor(interaction.guild.id)
-
-        if not is_professor(interaction):
-            await interaction.response.send_message("\u26d4 This command is only available to professors.", ephemeral=True)
-            return
-
         try:
+            atualizar_ultima_interacao_servidor(interaction.guild.id)
+
+            if not is_professor(interaction):
+                await interaction.response.send_message("\u26d4 This command is only available to professors.", ephemeral=True)
+                return
+
             dados_temporais = quiz_repository.obter_quizzes_por_periodo(interaction.guild.id)
 
             if not dados_temporais:

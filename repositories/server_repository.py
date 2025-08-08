@@ -2,17 +2,25 @@ from firebase_init import db, SERVER_TIMESTAMP
 import logging
 
 def registrar_servidor(guild):
-    return db.collection("servers").document(str(guild.id)).set({
-        "owner_id": str(guild.owner_id),
-        "server_id": str(guild.id),
-        "joined_at": SERVER_TIMESTAMP,
-        "status": "Active"
-    })
+    try:
+        db.collection("servers").document(str(guild.id)).set({
+            "owner_id": str(guild.owner_id),
+            "server_id": str(guild.id),
+            "joined_at": SERVER_TIMESTAMP,
+            "status": "Active"
+        })
+        logging.info(f"✅ Servidor {guild.id} registrado com sucesso.")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar servidor {guild.id}: {e}")
 
 def atualizar_status_servidor(guild_id, status):
-    return db.collection("servers").document(str(guild_id)).update({
-        "status": status
-    })
+    try:
+        db.collection("servers").document(str(guild_id)).update({
+            "status": status
+        })
+        logging.info(f"✅ Status do servidor {guild_id} atualizado para '{status}'.")
+    except Exception as e:
+        logging.error(f"❌ Erro ao atualizar status do servidor {guild_id}: {e}")
 
 def atualizar_ultima_interacao_servidor(guild_id: int):
     try:
@@ -28,7 +36,6 @@ def desativar_servidor(guild_id: int):
         db.collection("servers").document(str(guild_id)).update({
             "status": "disabled"
         })
-        print(f"📁 Status do servidor {guild_id} atualizado para 'disabled'")
+        logging.info(f"📁 Status do servidor {guild_id} atualizado para 'disabled'")
     except Exception as e:
         logging.error(f"❌ Erro ao desativar servidor: {e}")
-
