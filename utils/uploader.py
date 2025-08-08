@@ -1,11 +1,10 @@
 import discord
 import os
-from llm_utils import generar_preguntas_desde_pdf
+from utils.llm_utils import generar_preguntas_desde_pdf
 import json
 import random
 
 RUTA_DOCS = "docs"
-
 
 async def handle_upload(ctx, nombre_topico):
     if not ctx.message.attachments:
