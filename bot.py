@@ -7,7 +7,7 @@ import logging
 from utils.keep_alive import keep_alive
 from commands import questions_commands, quiz_commands, stats_commands, topics_commands
 from repositories.server_repository import registrar_servidor, desativar_servidor, atualizar_ultima_interacao_servidor
-from repositories.user_repository import registrar_usuarios_servidor
+from repositories.user_repository import register_single_user, registrar_usuarios_servidor
 from utils.utils import is_professor
 
 load_dotenv()
@@ -61,6 +61,22 @@ async def on_guild_join(guild: discord.Guild):
             "👋 Hello! Thanks for adding me to this server.\n"
             "Use `/help` to see how I can assist you with true or false quizzes. 🎓"
         )
+        
+@bot.event
+async def on_member_join(member: discord.Member):
+    logging.info(f"👤 Novo usuário entrou: {member.name} (ID: {member.id}) no servidor {member.guild.name}")
+
+    try:
+        register_single_user(member.guild, member)
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar novo usuário {member.id}: {e}")
+
+    canal = discord.utils.find(
+        lambda c: c.permissions_for(member.guild.me).send_messages and isinstance(c, discord.TextChannel),
+        member.guild.text_channels
+    )
+    if canal:
+        await canal.send(f"👋 Bem-vindo(a) ao servidor, {member.mention}!")
 
 @bot.event
 async def on_guild_remove(guild: discord.Guild):

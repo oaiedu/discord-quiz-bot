@@ -2,3 +2,6 @@ discord.py
 requests
 PyMuPDF
 google-cloud-storage
+python-dotenv
+pytz
+matplotlib
