@@ -5,7 +5,6 @@ from firebase_admin import firestore
 from datetime import datetime
 import pytz
 
-
 def registrar_usuarios_servidor(guild):
     batch = db.batch()
     for member in guild.members:
@@ -21,6 +20,28 @@ def registrar_usuarios_servidor(guild):
             "joined_bot_at": SERVER_TIMESTAMP
         })
     return batch.commit()
+
+def register_single_user(guild, member):
+    if member.bot:
+        return None
+
+    doc_ref = db.collection("servers") \
+                .document(str(guild.id)) \
+                .collection("users") \
+                .document(str(member.id))
+
+    if doc_ref.get().exists:
+        logging.info(f"⚠️ Usuário {member.name} ({member.id}) já está registrado.")
+        return None
+
+    doc_ref.set({
+        "user_id": str(member.id),
+        "name": member.name,
+        "joined_bot_at": SERVER_TIMESTAMP
+    })
+
+    logging.info(f"✅ Usuário {member.name} ({member.id}) registrado com sucesso.")
+    return True
 
 def registrar_historico_usuario(user_id: int, guild_id: int, user_name: str, topic_id: str, acertos: int, total: int, types: List[str]):
     try:
