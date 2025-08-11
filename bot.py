@@ -89,6 +89,7 @@ async def on_guild_remove(guild: discord.Guild):
 
 @bot.tree.command(name="help", description="Explains how to use the bot and its available commands")
 async def help_command(interaction: discord.Interaction):
+    print("TESTEEEEEEEE")
     try:
         atualizar_ultima_interacao_servidor(interaction.guild.id)
         await interaction.response.defer(thinking=True, ephemeral=True)
