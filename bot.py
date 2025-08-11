@@ -22,13 +22,12 @@ class QuizBot(discord.Client):
         intents.message_content = True
         intents.guilds = True
         intents.members = True
-        super().__init__(intents=intents)
+        super().__init__(intents=intents, reconnect=True, heartbeat_timeout=60)
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
         await self.tree.sync()
         print("\U0001F310 Slash commands synchronized.")
-
 
 bot = QuizBot()
 questions_commands.register(bot.tree)
@@ -36,11 +35,18 @@ topics_commands.register(bot.tree)
 quiz_commands.register(bot.tree)
 stats_commands.register(bot.tree)
 
-
 @bot.event
 async def on_ready():
     print(f"\u2705 Bot connected as {bot.user}")
-    
+
+@bot.event
+async def on_disconnect():
+    logging.warning("⚠ Bot desconectado. Tentando reconectar...")
+
+@bot.event
+async def on_resumed():
+    logging.info("✅ Bot reconectado com sucesso!")
+
 @bot.event
 async def on_guild_join(guild: discord.Guild):
     logging.info(f"🆕 Bot added to server: {guild.name} (ID: {guild.id})")
@@ -61,7 +67,7 @@ async def on_guild_join(guild: discord.Guild):
             "👋 Hello! Thanks for adding me to this server.\n"
             "Use `/help` to see how I can assist you with true or false quizzes. 🎓"
         )
-        
+
 @bot.event
 async def on_member_join(member: discord.Member):
     logging.info(f"👤 Novo usuário entrou: {member.name} (ID: {member.id}) no servidor {member.guild.name}")
@@ -86,10 +92,8 @@ async def on_guild_remove(guild: discord.Guild):
     except Exception as e:
         print(f"❌ Error updating server status {guild.id}: {e}")
 
-
 @bot.tree.command(name="help", description="Explains how to use the bot and its available commands")
 async def help_command(interaction: discord.Interaction):
-    print("TESTEEEEEEEE")
     try:
         atualizar_ultima_interacao_servidor(interaction.guild.id)
         await interaction.response.defer(thinking=True, ephemeral=True)
@@ -120,8 +124,6 @@ async def help_command(interaction: discord.Interaction):
     except Exception as e:
         logging.error(f"Error calling help: {e}")
         await interaction.response.send_message("❌ Error calling help.")
-        
-
 
 keep_alive()
 bot.run(os.getenv("DISCORD_TOKEN"))
