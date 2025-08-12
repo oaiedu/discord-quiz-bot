@@ -13,7 +13,7 @@ def listar_perguntas_por_topico(guild_id: int, topic: str):
         if not topic_ref:
             return []
 
-        perguntas_ref = topic_ref[0].reference.collection("questions").order_by("pregunta").get()
+        perguntas_ref = topic_ref[0].reference.collection("questions").order_by("question").get()
         return [doc.to_dict() | {"id": doc.id} for doc in perguntas_ref]
 
     except Exception as e:
@@ -37,8 +37,8 @@ def adicionar_pergunta(guild_id: int, topic: str, pergunta: str, resposta: str):
 
         nova_ref = questions_ref.document()
         nova_ref.set({
-            "pregunta": pergunta,
-            "respuesta": resposta
+            "question": pergunta,
+            "correct_answer": resposta
         })
         return nova_ref.id
 

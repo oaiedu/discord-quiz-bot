@@ -118,12 +118,12 @@ async def help_command(interaction: discord.Interaction):
                 "💬 To answer a quiz, respond with a sequence like `TFTFT`.\n"
                 "⏱️ You have 60 seconds to answer each quiz.\n"
                 "🧠 Happy practicing!"
-            )
+            )   
 
         await interaction.followup.send(mensaje, ephemeral=True)
     except Exception as e:
         logging.error(f"Error calling help: {e}")
-        await interaction.response.send_message("❌ Error calling help.")
+        await interaction.response.send_message("❌ Error calling help.", ephemeral=True)
 
 keep_alive()
 bot.run(os.getenv("DISCORD_TOKEN"))

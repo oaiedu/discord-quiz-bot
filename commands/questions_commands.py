@@ -58,7 +58,7 @@ def register(tree: app_commands.CommandTree):
             bloco_atual = f"📚 Questions for `{topic}`:\n"
 
             for i, q in enumerate(perguntas, start=1):
-                linha = f"{i}. {q['pregunta']} (Answer: {q['respuesta']})\n"
+                linha = f"{i}. {q['question']} (Answer: {q['correct_answer']})\n"
                 if len(bloco_atual) + len(linha) > 2000:
                     blocos.append(bloco_atual)
                     bloco_atual = ""
@@ -71,8 +71,8 @@ def register(tree: app_commands.CommandTree):
             for bloco in blocos[1:]:
                 await interaction.followup.send(bloco, ephemeral=True)
         except Exception as e:
-            logging.error(f"Error calling help: {e}")
-            await interaction.response.send_message("❌ Error calling help.")
+            logging.error(f"Error listing questions: {e}")
+            await interaction.response.send_message("❌ Error listing questions.", ephemeral=True)
 
     @tree.command(name="delete_question", description="Delete a question by ID (Professors only)")
     @app_commands.describe(topic="Topic name", id="Question ID (string)")

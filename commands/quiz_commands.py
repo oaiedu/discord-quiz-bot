@@ -52,7 +52,7 @@ def register(tree: app_commands.CommandTree):
             preguntas_data = obter_preguntas_por_topic(interaction.guild.id, nombre_topico)
 
             if not preguntas_data:
-                await interaction.response.send_message(f"❌ There are no questions registered for the topic `{nombre_topico}`.")
+                await interaction.response.send_message(f"❌ There are no questions registered for the topic `{nombre_topico}`.", ephemeral=True)
                 return
 
             preguntas = random.sample(preguntas_data, min(5, len(preguntas_data)))
@@ -109,7 +109,7 @@ def register(tree: app_commands.CommandTree):
 
                 timeout = await view.wait()
                 if timeout:
-                    await interaction.followup.send("⏰ Time's up for this question.")
+                    await interaction.followup.send("⏰ Time's up for this question.", ephemeral=True)
                     return
 
             resultado = "\n📊 Results:\n"
@@ -137,4 +137,4 @@ def register(tree: app_commands.CommandTree):
 
         except Exception as e:
             logging.error(f"Error during quiz: {e}")
-            await interaction.response.send_message("❌ An error occurred during the quiz.")
+            await interaction.response.send_message("❌ An error occurred during the quiz.", ephemeral=True)

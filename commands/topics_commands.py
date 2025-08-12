@@ -19,7 +19,7 @@ async def save_pdf(interaction: Interaction, archivo: discord.Attachment, nombre
             return
         
         if not archivo.filename.endswith(".pdf"):
-            await interaction.followup.send("❌ Only PDF files are allowed.")
+            await interaction.followup.send("❌ Only PDF files are allowed.", ephemeral=True)
             return
 
         os.makedirs(RUTA_DOCS, exist_ok=True)
@@ -30,7 +30,7 @@ async def save_pdf(interaction: Interaction, archivo: discord.Attachment, nombre
         print(pdf_url)
         
         if not pdf_url:
-            await interaction.response.send_message("❌ No topics available yet.") 
+            await interaction.response.send_message("❌ No topics available yet.", ephemeral=True) 
         
         if os.path.exists(ruta_pdf):
             os.remove(ruta_pdf)
@@ -59,14 +59,14 @@ def register(tree: app_commands.CommandTree):
             temas_docs = obter_topics_por_servidor(interaction.guild.id)
 
             if not temas_docs:
-                await interaction.response.send_message("❌ No topics available yet.")
+                await interaction.response.send_message("❌ No topics available yet.", ephemeral=True)
                 return
 
             temas = "\n".join(f"- {doc.to_dict().get('title', 'Untitled')}" for doc in temas_docs)
-            await interaction.response.send_message(f"📚 Available topics:\n{temas}")
+            await interaction.response.send_message(f"📚 Available topics:\n{temas}", ephemeral=True)
         except Exception as e:
             logging.error(f"Error loading topics: {e}")
-            await interaction.response.send_message("❌ Error loading topics.")
+            await interaction.response.send_message("❌ Error loading topics.", ephemeral=True)
 
     ### 
     # SAVE PDF TO STORAGE
@@ -88,12 +88,12 @@ def register(tree: app_commands.CommandTree):
             try:
                 guild_id = interaction.guild.id
                 criar_topico_sem_perguntas(guild_id, nombre_topico, pdf_url)
-                await interaction.followup.send("🧠 Topic created successfully, but without questions.")
+                await interaction.followup.send("🧠 Topic created successfully, but without questions.", ephemeral=True)
             except Exception as e:
-                await interaction.followup.send(f"❌ Error generating questions: {e}")
+                await interaction.followup.send(f"❌ Error generating questions: {e}", ephemeral=True)
         except Exception as e:
             logging.error(f"Error loading topics: {e}")
-            await interaction.response.send_message("❌ Error loading topics.")
+            await interaction.response.send_message("❌ Error loading topics.", ephemeral=True)
             
     ###
     # SAVE PDF AND GENERATE QUESTIONS AUTOMATICALLY
@@ -114,6 +114,6 @@ def register(tree: app_commands.CommandTree):
 
             guild_id = interaction.guild.id
             generar_preguntas_desde_pdf(nombre_topico, None, guild_id, pdf_url, 50, QuestionType.TRUE_FALSE)
-            await interaction.followup.send("🧠 Questions successfully generated from the PDF.")
+            await interaction.followup.send("🧠 Questions successfully generated from the PDF.", ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f"❌ Error generating questions: {e}")
+            await interaction.followup.send(f"❌ Error generating questions: {e}", ephemeral=True)
