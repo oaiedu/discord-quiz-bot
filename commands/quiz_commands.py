@@ -67,7 +67,7 @@ def register(tree: app_commands.CommandTree):
             preguntas_data = obter_preguntas_por_topic(interaction.guild.id, nombre_topico)
 
             if not preguntas_data:
-                await interaction.followup.send(f"❌ There are no questions registered for the topic `{nombre_topico}`.", ephemeral=True)
+                await interaction.followup.send(f"❌ There are no questions registered for the topic `{nombre_topico}`.", ephemeral=True, ephemeral=True)
                 logger.warning(f"❌ No hay preguntas para el tópico: {nombre_topico}",
                               command="quiz",
                               user_id=str(interaction.user.id),
@@ -132,6 +132,7 @@ def register(tree: app_commands.CommandTree):
                 timeout = await view.wait()
                 if timeout:
                     await interaction.followup.send("⏰ Time's up for this question.", ephemeral=True)
+                    
                     logger.info(f"⏰ Timeout en pregunta del quiz para {interaction.user.display_name}",
                                command="quiz",
                                user_id=str(interaction.user.id),
@@ -191,3 +192,5 @@ def register(tree: app_commands.CommandTree):
                 await interaction.followup.send("❌ An error occurred during the quiz.", ephemeral=True)
             except Exception:
                 pass
+            logging.error(f"Error during quiz: {e}")
+            await interaction.response.send_message("❌ An error occurred during the quiz.", ephemeral=True)

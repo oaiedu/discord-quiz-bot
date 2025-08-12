@@ -139,7 +139,7 @@ def register(tree: app_commands.CommandTree):
             bloco_atual = f"📚 Questions for `{topic}`:\n"
 
             for i, q in enumerate(perguntas, start=1):
-                linha = f"{i}. {q['pregunta']} (Answer: {q['respuesta']})\n"
+                linha = f"{i}. {q['question']} (Answer: {q['correct_answer']})\n"
                 if len(bloco_atual) + len(linha) > 2000:
                     blocos.append(bloco_atual)
                     bloco_atual = ""
@@ -171,10 +171,10 @@ def register(tree: app_commands.CommandTree):
                         topic=topic,
                         error_type=type(e).__name__,
                         error_message=str(e),
-                        operation="command_error")
+                        operation="command_error",)
             
             try:
-                await interaction.followup.send("❌ Error calling help.", ephemeral=True)
+                await interaction.followup.send("❌ Error en comando /list_questions.", ephemeral=True)
             except Exception:
                 pass
 

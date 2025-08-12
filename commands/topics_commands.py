@@ -20,7 +20,7 @@ async def save_pdf(interaction: Interaction, archivo: discord.Attachment, nombre
             return
         
         if not archivo.filename.endswith(".pdf"):
-            await interaction.followup.send("❌ Only PDF files are allowed.")
+            await interaction.followup.send("❌ Only PDF files are allowed.", ephemeral=True)
             return
 
         os.makedirs(RUTA_DOCS, exist_ok=True)
@@ -31,7 +31,7 @@ async def save_pdf(interaction: Interaction, archivo: discord.Attachment, nombre
         print(pdf_url)
         
         if not pdf_url:
-            await interaction.response.send_message("❌ No topics available yet.") 
+            await interaction.response.send_message("❌ No topics available yet.", ephemeral=True) 
         
         if os.path.exists(ruta_pdf):
             os.remove(ruta_pdf)
@@ -91,7 +91,6 @@ def register(tree: app_commands.CommandTree):
 
             topic_count = len(temas_docs)
             temas = "\n".join(f"- {doc.to_dict().get('title', 'Untitled')}" for doc in temas_docs)
-            
             logger.info("Topics command completed successfully",
                        command="topics",
                        user_id=str(interaction.user.id),
