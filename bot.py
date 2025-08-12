@@ -2,16 +2,15 @@ import discord
 from dotenv import load_dotenv
 import os
 from discord import app_commands
-import logging
 
 from utils.keep_alive import keep_alive
+from utils.structured_logging import structured_logger as logger
 from commands import questions_commands, quiz_commands, stats_commands, topics_commands
 from repositories.server_repository import registrar_servidor, desativar_servidor, atualizar_ultima_interacao_servidor
 from repositories.user_repository import register_single_user, registrar_usuarios_servidor
 from utils.utils import is_professor
 
 load_dotenv()
-logging.basicConfig(level=logging.INFO)
 
 RUTA_DOCS = "docs"
 ROL_PROFESOR = "faculty"
@@ -49,13 +48,21 @@ async def on_resumed():
 
 @bot.event
 async def on_guild_join(guild: discord.Guild):
-    logging.info(f"🆕 Bot added to server: {guild.name} (ID: {guild.id})")
+    logger.info(f"🆕 Bot added to server: {guild.name} (ID: {guild.id})",
+               guild_id=str(guild.id),
+               server_name=guild.name,
+               operation="bot_guild_join")
     try:
         registrar_servidor(guild)
         registrar_usuarios_servidor(guild)
-        logging.info(f"📌 Server and users registered in Firestore: {guild.id}")
+        logger.info(f"📌 Server and users registered in Firestore: {guild.id}",
+                   guild_id=str(guild.id),
+                   operation="firestore_registration")
     except Exception as e:
-        logging.error(f"❌ Error registering server or users in Firestore: {e}")
+        logger.error(f"❌ Error registering server or users in Firestore: {e}",
+                    guild_id=str(guild.id),
+                    operation="firestore_registration",
+                    error_type=type(e).__name__)
 
     canal = discord.utils.find(
         lambda c: c.permissions_for(guild.me).send_messages and isinstance(c, discord.TextChannel),
@@ -70,12 +77,20 @@ async def on_guild_join(guild: discord.Guild):
 
 @bot.event
 async def on_member_join(member: discord.Member):
-    logging.info(f"👤 Novo usuário entrou: {member.name} (ID: {member.id}) no servidor {member.guild.name}")
+    logger.info(f"👤 Novo usuário entrou: {member.name} (ID: {member.id}) no servidor {member.guild.name}",
+               user_id=str(member.id),
+               guild_id=str(member.guild.id),
+               username=member.name,
+               operation="member_join")
 
     try:
         register_single_user(member.guild, member)
     except Exception as e:
-        logging.error(f"❌ Erro ao registrar novo usuário {member.id}: {e}")
+        logger.error(f"❌ Erro ao registrar novo usuário {member.id}: {e}",
+                    user_id=str(member.id),
+                    guild_id=str(member.guild.id),
+                    operation="user_registration",
+                    error_type=type(e).__name__)
 
     canal = discord.utils.find(
         lambda c: c.permissions_for(member.guild.me).send_messages and isinstance(c, discord.TextChannel),
@@ -94,9 +109,22 @@ async def on_guild_remove(guild: discord.Guild):
 
 @bot.tree.command(name="help", description="Explains how to use the bot and its available commands")
 async def help_command(interaction: discord.Interaction):
+    # DEFER INMEDIATO para evitar timeout de Discord (3 segundos)
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    
+    # Log del comando ejecutado con información del usuario
+    logger.info(f"🔍 Comando /help ejecutado por {interaction.user.display_name}",
+               command="help",
+               user_id=str(interaction.user.id),
+               username=interaction.user.display_name,
+               guild_id=str(interaction.guild.id) if interaction.guild else None,
+               guild_name=interaction.guild.name if interaction.guild else None,
+               channel_id=str(interaction.channel.id) if interaction.channel else None,
+               is_professor=is_professor(interaction),
+               operation="command_execution")
+    
     try:
         atualizar_ultima_interacao_servidor(interaction.guild.id)
-        await interaction.response.defer(thinking=True, ephemeral=True)
 
         if is_professor(interaction):
             mensaje = (
@@ -121,9 +149,29 @@ async def help_command(interaction: discord.Interaction):
             )   
 
         await interaction.followup.send(mensaje, ephemeral=True)
+        
+        # Log de éxito del comando
+        logger.info(f"✅ Comando /help completado exitosamente para {interaction.user.display_name}",
+                   command="help",
+                   user_id=str(interaction.user.id),
+                   username=interaction.user.display_name,
+                   guild_id=str(interaction.guild.id) if interaction.guild else None,
+                   is_professor=is_professor(interaction),
+                   operation="command_success")
     except Exception as e:
-        logging.error(f"Error calling help: {e}")
-        await interaction.response.send_message("❌ Error calling help.", ephemeral=True)
+        logger.error(f"❌ Error en comando /help: {e}",
+                    command="help",
+                    user_id=str(interaction.user.id),
+                    username=interaction.user.display_name,
+                    guild_id=str(interaction.guild.id) if interaction.guild else None,
+                    error_type=type(e).__name__,
+                    error_message=str(e))
+        
+        # Usar followup porque ya hicimos defer
+        try:
+            await interaction.followup.send("❌ Error calling help.", ephemeral=True)
+        except Exception:
+            pass  # Si falla, al menos tenemos el log
 
 keep_alive()
 bot.run(os.getenv("DISCORD_TOKEN"))

@@ -9,6 +9,7 @@ from repositories.server_repository import atualizar_ultima_interacao_servidor
 from repositories.stats_repository import guardar_estadistica
 from repositories.topic_repository import obter_preguntas_por_topic
 from utils.enum import QuestionType
+from utils.structured_logging import structured_logger as logger
 from utils.utils import obtener_temas_autocompletado, registrar_user_estadistica
 
 class QuizButton(Button):
@@ -45,6 +46,20 @@ def register(tree: app_commands.CommandTree):
     @app_commands.describe(nombre_topico="Topic name")
     @app_commands.autocomplete(nombre_topico=obtener_temas_autocompletado)
     async def quiz(interaction: discord.Interaction, nombre_topico: str):
+        # DEFER INMEDIATO para evitar timeout de Discord (3 segundos)
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        
+        # Log del comando ejecutado
+        logger.info(f"🔍 Comando /quiz ejecutado por {interaction.user.display_name}",
+                   command="quiz",
+                   user_id=str(interaction.user.id),
+                   username=interaction.user.display_name,
+                   guild_id=str(interaction.guild.id) if interaction.guild else None,
+                   guild_name=interaction.guild.name if interaction.guild else None,
+                   channel_id=str(interaction.channel.id) if interaction.channel else None,
+                   topic=nombre_topico,
+                   operation="command_execution")
+        
         try:
             if interaction.guild:
                 atualizar_ultima_interacao_servidor(interaction.guild.id)
@@ -52,21 +67,21 @@ def register(tree: app_commands.CommandTree):
             preguntas_data = obter_preguntas_por_topic(interaction.guild.id, nombre_topico)
 
             if not preguntas_data:
-                await interaction.response.send_message(f"❌ There are no questions registered for the topic `{nombre_topico}`.", ephemeral=True)
+                await interaction.followup.send(f"❌ There are no questions registered for the topic `{nombre_topico}`.", ephemeral=True, ephemeral=True)
+                logger.warning(f"❌ No hay preguntas para el tópico: {nombre_topico}",
+                              command="quiz",
+                              user_id=str(interaction.user.id),
+                              username=interaction.user.display_name,
+                              guild_id=str(interaction.guild.id) if interaction.guild else None,
+                              topic=nombre_topico,
+                              operation="no_questions_found")
                 return
 
             preguntas = random.sample(preguntas_data, min(5, len(preguntas_data)))
             
-            await interaction.response.send_message("📋 Starting the quiz...", ephemeral=True)
+            await interaction.followup.send("📋 Starting the quiz...", ephemeral=True)
             
             respostas_usuario = []
-            async def handle_answer(interaction_inner, escolha, correta):
-                if interaction.user.id != interaction_inner.user.id:
-                    await interaction_inner.response.send_message("This quiz isn't for you!", ephemeral=True)
-                    return False
-
-                respostas_usuario.append((escolha.upper(), correta.upper()))
-                return escolha.upper() == correta.upper()
 
             for idx, p in enumerate(preguntas):
                 data = p.to_dict()
@@ -100,7 +115,14 @@ def register(tree: app_commands.CommandTree):
                             correct=is_correct
                         )
                     except Exception as err:
-                        logging.warning(f"Erro ao atualizar stats da pergunta {question_id}: {err}")
+                        logger.warning(f"Erro ao atualizar stats da pergunta {question_id}: {err}",
+                                      command="quiz",
+                                      user_id=str(interaction.user.id),
+                                      username=interaction.user.display_name,
+                                      guild_id=str(interaction.guild.id) if interaction.guild else None,
+                                      question_id=question_id,
+                                      error_type=type(err).__name__,
+                                      operation="stats_update_error")
 
                     return is_correct
 
@@ -110,6 +132,15 @@ def register(tree: app_commands.CommandTree):
                 timeout = await view.wait()
                 if timeout:
                     await interaction.followup.send("⏰ Time's up for this question.", ephemeral=True)
+                    
+                    logger.info(f"⏰ Timeout en pregunta del quiz para {interaction.user.display_name}",
+                               command="quiz",
+                               user_id=str(interaction.user.id),
+                               username=interaction.user.display_name,
+                               guild_id=str(interaction.guild.id) if interaction.guild else None,
+                               topic=nombre_topico,
+                               question_number=idx+1,
+                               operation="question_timeout")
                     return
 
             resultado = "\n📊 Results:\n"
@@ -135,6 +166,31 @@ def register(tree: app_commands.CommandTree):
             registrar_user_estadistica(interaction.user, nombre_topico, correctas, len(preguntas), lista_tipos)
             guardar_estadistica(interaction.guild.id, interaction.user, nombre_topico, correctas, len(preguntas))
 
+            # Log de éxito del comando
+            logger.info(f"✅ Comando /quiz completado exitosamente para {interaction.user.display_name}",
+                       command="quiz",
+                       user_id=str(interaction.user.id),
+                       username=interaction.user.display_name,
+                       guild_id=str(interaction.guild.id) if interaction.guild else None,
+                       topic=nombre_topico,
+                       score=f"{correctas}/{len(preguntas)}",
+                       questions_count=len(preguntas),
+                       operation="command_success")
+
         except Exception as e:
+            logger.error(f"❌ Error en comando /quiz: {e}",
+                        command="quiz",
+                        user_id=str(interaction.user.id),
+                        username=interaction.user.display_name,
+                        guild_id=str(interaction.guild.id) if interaction.guild else None,
+                        topic=nombre_topico,
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        operation="command_error")
+            
+            try:
+                await interaction.followup.send("❌ An error occurred during the quiz.", ephemeral=True)
+            except Exception:
+                pass
             logging.error(f"Error during quiz: {e}")
             await interaction.response.send_message("❌ An error occurred during the quiz.", ephemeral=True)
