@@ -1,32 +1,32 @@
 from firebase_init import db
 from datetime import datetime
 from collections import defaultdict
+import logging
 
 
-def obter_quizzes_por_periodo(guild_id: int):
+def get_quizzes_by_period(guild_id: int):
     try:
-        usuarios_ref = db.collection("servers") \
-                         .document(str(guild_id)) \
-                         .collection("users")
+        users_ref = db.collection("servers") \
+                      .document(str(guild_id)) \
+                      .collection("users")
 
-        usuarios_docs = usuarios_ref.stream()
+        users_docs = users_ref.stream()
 
-        quizzes_por_dia = defaultdict(int)
+        quizzes_per_day = defaultdict(int)
 
-        for doc in usuarios_docs:
-            dados = doc.to_dict()
-            historico = dados.get("history", [])
+        for doc in users_docs:
+            data = doc.to_dict()
+            history = data.get("history", [])
 
-            for entrada in historico:
-                data_quiz = entrada.get("date")
-                if isinstance(data_quiz, datetime):
-                    data_str = data_quiz.date().isoformat()
-                    quizzes_por_dia[data_str] += 1
+            for entry in history:
+                quiz_date = entry.get("date")
+                if isinstance(quiz_date, datetime):
+                    date_str = quiz_date.date().isoformat()
+                    quizzes_per_day[date_str] += 1
 
-        quizzes_ordenados = dict(sorted(quizzes_por_dia.items()))
-        return quizzes_ordenados
+        ordered_quizzes = dict(sorted(quizzes_per_day.items()))
+        return ordered_quizzes
 
     except Exception as e:
-        import logging
-        logging.error(f"❌ Erro ao obter quizzes por período: {e}")
+        logging.error(f"❌ Error while getting quizzes by period: {e}")
         return {}
