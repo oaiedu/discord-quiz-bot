@@ -32,4 +32,4 @@ You agree not to:
 
 ## Contact
 For questions regarding these Terms of Service, contact:  
-**Email:** `your@email.com`
+**Email:** `hello@oaiedu.com`

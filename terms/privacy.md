@@ -20,7 +20,7 @@ This Discord bot ("Bot") respects your privacy. This Privacy Policy explains wha
 
 ## Data Retention
 - User data is stored only as long as necessary for the Bot to function.
-- You may request deletion of your data by contacting: `your@email.com`.
+- You may request deletion of your data by contacting: `hello@oaiedu.com`.
 
 ## Security
 - We take reasonable measures to protect your data but cannot guarantee complete security.
@@ -30,4 +30,4 @@ This Discord bot ("Bot") respects your privacy. This Privacy Policy explains wha
 - Withdrawal of consent where applicable.
 
 For questions or concerns about privacy, contact:  
-**Email:** `your@email.com`
+**Email:** `hello@oaiedu.com`
