@@ -4,6 +4,7 @@ from discord import app_commands, Interaction, ButtonStyle
 import discord
 from discord.ui import View, Button
 
+from repositories.level_repository import add_xp, update_streak
 from repositories.question_repository import update_question_stats
 from repositories.server_repository import update_server_last_interaction
 from repositories.stats_repository import save_statistic
@@ -185,6 +186,17 @@ def register(tree: app_commands.CommandTree):
                 interaction.user, topic_name, correct_count, len(questions), type_list)
             save_statistic(interaction.guild.id, interaction.user,
                            topic_name, correct_count, len(questions))
+
+            xp_gain = correct_count - (len(questions) - correct_count)
+            final_xp = add_xp(str(interaction.user.id),
+                              str(interaction.guild.id), xp_gain)
+            await interaction.followup.send(
+                f"✨ Você ganhou {xp_gain} XP! Seu total agora é {final_xp} XP.", ephemeral=True)
+
+            streak = update_streak(str(interaction.user.id), str(
+                interaction.guild.id), correct_count == len(questions))
+            if streak >= 3:
+                await interaction.followup.send(f"🔥 Você está em streak! ({streak} seguidas)", ephemeral=True)
 
             # Log command success
             logger.info(f"✅ Command /quiz successfully completed for {interaction.user.display_name}",

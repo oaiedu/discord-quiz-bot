@@ -1,8 +1,7 @@
 import logging
 from discord import app_commands, Interaction
 
-from repositories.question_repository import (
-    list_questions_by_topic, add_question, delete_question)
+from repositories.question_repository import (list_questions_by_topic, add_question, delete_question)
 from repositories.topic_repository import get_topic_by_name
 from utils.enum import QuestionType
 from utils.llm_utils import generate_questions_from_pdf

@@ -1,3 +1,4 @@
+import logging
 import discord
 from dotenv import load_dotenv
 import os
@@ -5,9 +6,9 @@ from discord import app_commands
 
 from utils.keep_alive import keep_alive
 from utils.structured_logging import structured_logger as logger
-from commands import questions_commands, quiz_commands, stats_commands, topics_commands
-from repositories.server_repository import registrar_servidor, desativar_servidor, atualizar_ultima_interacao_servidor
-from repositories.user_repository import register_single_user, registrar_usuarios_servidor
+from commands import questions_commands, quiz_commands, stats_commands, topics_commands, level_commands
+from repositories.server_repository import register_server, deactivate_server, update_server_last_interaction
+from repositories.user_repository import register_single_user, register_guild_users
 from utils.utils import is_professor
 
 load_dotenv()
@@ -33,6 +34,7 @@ questions_commands.register(bot.tree)
 topics_commands.register(bot.tree)
 quiz_commands.register(bot.tree)
 stats_commands.register(bot.tree)
+level_commands.register(bot.tree)
 
 @bot.event
 async def on_ready():
@@ -53,8 +55,8 @@ async def on_guild_join(guild: discord.Guild):
                server_name=guild.name,
                operation="bot_guild_join")
     try:
-        registrar_servidor(guild)
-        registrar_usuarios_servidor(guild)
+        register_server(guild)
+        register_guild_users(guild)
         logger.info(f"📌 Server and users registered in Firestore: {guild.id}",
                    guild_id=str(guild.id),
                    operation="firestore_registration")
@@ -103,7 +105,7 @@ async def on_member_join(member: discord.Member):
 async def on_guild_remove(guild: discord.Guild):
     print(f"🔌 Bot removed from server: {guild.name} ({guild.id})")
     try:
-        desativar_servidor(guild.id)
+        deactivate_server(guild.id)
     except Exception as e:
         print(f"❌ Error updating server status {guild.id}: {e}")
 
@@ -124,7 +126,7 @@ async def help_command(interaction: discord.Interaction):
                operation="command_execution")
     
     try:
-        atualizar_ultima_interacao_servidor(interaction.guild.id)
+        update_server_last_interaction(interaction.guild.id)
 
         if is_professor(interaction):
             mensaje = (
