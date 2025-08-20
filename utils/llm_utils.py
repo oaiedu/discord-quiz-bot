@@ -5,17 +5,18 @@ import json
 import fitz
 import requests
 from google.cloud import storage
-from repositories.topic_repository import criar_topico_com_perguntas
+from repositories.topic_repository import create_topic_with_questions
 from utils.enum import QuestionType
 from utils.prompts import prompt_default, prompt_multiple_choice, prompt_short_answer, prompt_true_false
 
 load_dotenv()
 
-# Clave de API desde secrets de Replit
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 LLM_MODEL = "mistralai/mistral-7b-instruct:free"
 
+
 def extract_text_from_pdf(pdf_url):
+    """Extract plain text from a PDF file hosted online"""
     response = requests.get(pdf_url)
     response.raise_for_status()
 
@@ -27,36 +28,26 @@ def extract_text_from_pdf(pdf_url):
 
     return text
 
-# def subir_a_gcs(nombre_archivo_local, nombre_bucket, nombre_destino):
-#     client = storage.Client()
-#     bucket = client.bucket(nombre_bucket)
-#     blob = bucket.blob(nombre_destino)
-#     blob.upload_from_filename(nombre_archivo_local)
-#     print(f"✅ {nombre_archivo_local} subido a gs://{nombre_bucket}/{nombre_destino}")
 
-# def descargar_de_gcs(nombre_remoto, nombre_bucket, nombre_local):
-#     client = storage.Client()
-#     bucket = client.bucket(nombre_bucket)
-#     blob = bucket.blob(nombre_remoto)
-#     blob.download_to_filename(nombre_local)
-#     print(f"✅ {nombre_remoto} descargado de gs://{nombre_bucket} a {nombre_local}")
-    
-def generar_prompt_perguntas(texto, topico, qty, type):
+def generate_prompt_questions(text, topic, qty, qtype):
+    """Generate the proper prompt depending on the question type"""
     switch = {
         QuestionType.MULTIPLE_CHOICE: prompt_multiple_choice,
         QuestionType.TRUE_FALSE: prompt_true_false,
     }
 
-    prompt_fn = switch.get(type, prompt_default)
-    return prompt_fn(topico, texto, qty)
+    prompt_fn = switch.get(qtype, prompt_default)
+    return prompt_fn(topic, text, qty)
 
-def enviar_a_openrouter(prompt):
+
+def send_to_openrouter(prompt):
+    """Send the prompt to OpenRouter API and return the response"""
     try:
         url = "https://openrouter.ai/api/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
-            "Referer": "https://replit.com/@marcgc21",  # reemplázalo si quieres
+            "Referer": "https://replit.com/@marcgc21",  # replace with your own if needed
             "X-Title": "Discord Quiz Bot"
         }
 
@@ -73,24 +64,26 @@ def enviar_a_openrouter(prompt):
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
     except Exception as e:
-        print("ERRO NO OPENROUTER", e)
+        print("⚠️ ERROR IN OPENROUTER REQUEST:", e)
 
 
-def guardar_preguntas_json(topic_name, topic_id, preguntas_str, guild_id, document_url, qty, type):
+def save_questions_json(topic_name, topic_id, questions_str, guild_id, document_url, qty, qtype):
+    """Save generated questions in Firestore and also locally in a JSON file"""
     try:
-        preguntas_novas = json.loads(preguntas_str)
-        if isinstance(preguntas_novas, list):
-            preguntas_novas = preguntas_novas[:qty]
+        new_questions = json.loads(questions_str)
+        if isinstance(new_questions, list):
+            new_questions = new_questions[:qty]
     except json.JSONDecodeError:
-        print("⚠️ Error al parsear JSON generado. Verifica el output del modelo.")
+        print("⚠️ Error parsing generated JSON. Check the model output.")
         return
 
-    criar_topico_com_perguntas(guild_id, topic_name, topic_id, preguntas_novas, document_url, qty, type)
+    create_topic_with_questions(
+        guild_id, topic_name, topic_id, new_questions, document_url, qty, qtype)
 
-    print(f"✅ {len(preguntas_novas)} preguntas guardadas en Firestore para el servidor {guild_id} y tópico '{topic_name}'")
+    print(f"✅ {len(new_questions)} questions saved in Firestore for guild {guild_id} and topic '{topic_name}'")
 
-    if os.path.exists("preguntas.json"):
-        with open("preguntas.json", "r", encoding="utf-8") as f:
+    if os.path.exists("questions.json"):
+        with open("questions.json", "r", encoding="utf-8") as f:
             data = json.load(f)
     else:
         data = {}
@@ -98,17 +91,18 @@ def guardar_preguntas_json(topic_name, topic_id, preguntas_str, guild_id, docume
     if topic_name not in data:
         data[topic_name] = []
 
-    for i, pregunta in enumerate(preguntas_novas, start=1):
-        pregunta["id"] = str(len(data[topic_name]) + i)
-        data[topic_name].append(pregunta)
+    for i, question in enumerate(new_questions, start=1):
+        question["id"] = str(len(data[topic_name]) + i)
+        data[topic_name].append(question)
 
-    with open("preguntas.json", "w", encoding="utf-8") as f:
+    with open("questions.json", "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-def generar_preguntas_desde_pdf(topic_name, topic_id, guild_id, pdf_url, qty, type):
-    texto = extract_text_from_pdf(pdf_url)
-    prompt = generar_prompt_perguntas(texto, topic_name, qty, type)
-    resultado = enviar_a_openrouter(prompt)
-    guardar_preguntas_json(topic_name, topic_id, resultado, guild_id, pdf_url, qty, type)
-    
+def generate_questions_from_pdf(topic_name, topic_id, guild_id, pdf_url, qty, qtype):
+    """Full pipeline: extract text, generate questions with LLM, and save results"""
+    text = extract_text_from_pdf(pdf_url)
+    prompt = generate_prompt_questions(text, topic_name, qty, qtype)
+    result = send_to_openrouter(prompt)
+    save_questions_json(topic_name, topic_id, result,
+                        guild_id, pdf_url, qty, qtype)

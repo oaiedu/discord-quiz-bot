@@ -1,7 +1,8 @@
 import logging
 from firebase_init import db, Increment
 
-def listar_perguntas_por_topico(guild_id: int, topic: str):
+
+def list_questions_by_topic(guild_id: int, topic: str):
     try:
         topic_ref = db.collection("servers") \
                       .document(str(guild_id)) \
@@ -13,15 +14,17 @@ def listar_perguntas_por_topico(guild_id: int, topic: str):
         if not topic_ref:
             return []
 
-        perguntas_ref = topic_ref[0].reference.collection("questions").order_by("pregunta").get()
-        return [doc.to_dict() | {"id": doc.id} for doc in perguntas_ref]
+        questions_ref = topic_ref[0].reference.collection(
+            "questions").order_by("question").get()
+        return [doc.to_dict() | {"id": doc.id} for doc in questions_ref]
 
     except Exception as e:
-        logging.error(f"Erro ao listar perguntas do tópico '{topic}' no servidor {guild_id}: {e}")
+        logging.error(
+            f"Error listing questions for topic '{topic}' in server {guild_id}: {e}")
         return []
 
 
-def adicionar_pergunta(guild_id: int, topic: str, pergunta: str, resposta: str):
+def add_question(guild_id: int, topic: str, question: str, answer: str):
     try:
         topic_ref = db.collection("servers") \
                       .document(str(guild_id)) \
@@ -31,23 +34,24 @@ def adicionar_pergunta(guild_id: int, topic: str, pergunta: str, resposta: str):
                       .get()
 
         if not topic_ref:
-            raise ValueError(f"Tópico '{topic}' não encontrado")
+            raise ValueError(f"Topic '{topic}' not found")
 
         questions_ref = topic_ref[0].reference.collection("questions")
 
-        nova_ref = questions_ref.document()
-        nova_ref.set({
-            "pregunta": pergunta,
-            "respuesta": resposta
+        new_ref = questions_ref.document()
+        new_ref.set({
+            "question": question,
+            "correct_answer": answer
         })
-        return nova_ref.id
+        return new_ref.id
 
     except Exception as e:
-        logging.error(f"Erro ao adicionar pergunta no tópico '{topic}' do servidor {guild_id}: {e}")
-        raise  # relança o erro para ser tratado externamente se quiser
+        logging.error(
+            f"Error adding question to topic '{topic}' in server {guild_id}: {e}")
+        raise  # re-raise the error for external handling if needed
 
 
-def deletar_pergunta(guild_id: int, topic: str, question_id: str):
+def delete_question(guild_id: int, topic: str, question_id: str):
     try:
         topic_ref = db.collection("servers") \
                       .document(str(guild_id)) \
@@ -57,14 +61,16 @@ def deletar_pergunta(guild_id: int, topic: str, question_id: str):
                       .get()
 
         if not topic_ref:
-            raise ValueError("Tópico não encontrado")
+            raise ValueError("Topic not found")
 
-        pergunta_ref = topic_ref[0].reference.collection("questions").document(question_id)
-        pergunta_ref.delete()
+        question_ref = topic_ref[0].reference.collection(
+            "questions").document(question_id)
+        question_ref.delete()
 
     except Exception as e:
-        logging.error(f"Erro ao deletar pergunta {question_id} do tópico '{topic}' no servidor {guild_id}: {e}")
-        raise  # relança o erro para ser tratado externamente se quiser
+        logging.error(
+            f"Error deleting question {question_id} from topic '{topic}' in server {guild_id}: {e}")
+        raise  # re-raise the error for external handling if needed
 
 
 def update_question_stats(guild_id: int, topic_id: str, question_id: str, correct: bool):
@@ -86,5 +92,6 @@ def update_question_stats(guild_id: int, topic_id: str, question_id: str, correc
             })
 
     except Exception as e:
-        logging.error(f"Erro ao atualizar estatísticas da pergunta {question_id} do tópico {topic_id} no servidor {guild_id}: {e}")
+        logging.error(
+            f"Error updating stats for question {question_id} in topic {topic_id} in server {guild_id}: {e}")
         raise
