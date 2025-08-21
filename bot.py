@@ -131,49 +131,44 @@ async def help_command(interaction: discord.Interaction):
         if is_professor(interaction):
             mensaje = (
                 "📘 **Guide for Professors**\n\n"
-                "👉 `/quiz <topic>` — Launch a 5-question true or false quiz.\n"
+                "👉 `/quiz <topic>` — Launch a 5-question quiz.\n\n"
                 "👉 `/topics` — List the available topics to practice.\n"
-                "👉 `/upload <topic>` — Upload a PDF to generate new questions.\n"
-                "👉 `/stats` — View the results of all students.\n"
-                "👉 `/add_question`, `/list_questions`, `/delete_question` — Manage questions manually.\n\n"
-                "💬 To answer a quiz, respond with a sequence like `TFTFT`.\n"
+                "👉 `/upload_pdf <topic> <file>` — Upload a PDF (no questions generated).\n"
+                "👉 `/upload_topic <topic> <file>` — Upload a PDF and automatically generate questions True/False.\n\n"
+                "👉 `/generate_questions <topic> <qty> <type>` — Generate multiple questions for a topic.\n"
+                "👉 `/add_question` — Add a question manually.\n"
+                "👉 `/list_questions <topic>` — List all questions in a topic.\n"
+                "👉 `/delete_question <topic> <id>` — Delete a specific question.\n\n"
+                "👉 `/stats` — View global quiz results.\n"
+                "👉 `/user_stats` — See quiz stats per student.\n"
+                "👉 `/time_stats` — View quiz history over time.\n\n"
+                "👉 `/my_rank` — Show your XP and level.\n"
+                "👉 `/rank` — Show the top 5 XP leaderboard.\n"
+                "👉 `/user_rank <name>` — Show another user's rank.\n\n"
+                "💬 To answer a quiz, click the button for each answer you think is correct."
                 "⏱️ You have 60 seconds to answer each quiz.\n"
-                "🧠 Happy practicing!"
+                "🧠 Happy teaching!"
             )
         else:
             mensaje = (
                 "📘 **Guide for Students**\n\n"
-                "👉 `/quiz <topic>` — Launch a 5-question true or false quiz.\n"
-                "👉 `/topics` — List the available topics to practice.\n\n"
-                "💬 To answer a quiz, respond with a sequence like `TFTFT`.\n"
+                "👉 `/quiz <topic>` — Take a 5-question quiz.\n"
+                "👉 `/topics` — List all available quiz topics.\n"
+                "👉 `/my_rank` — Show your XP and level.\n"
+                "👉 `/rank` — Show the top 5 XP leaderboard.\n"
+                "💬 To answer a quiz, click the button for each answer you think is correct."
                 "⏱️ You have 60 seconds to answer each quiz.\n"
                 "🧠 Happy practicing!"
-            )   
+            )
 
         await interaction.followup.send(mensaje, ephemeral=True)
-        
-        # Log de éxito del comando
-        logger.info(f"✅ Comando /help completado exitosamente para {interaction.user.display_name}",
-                   command="help",
-                   user_id=str(interaction.user.id),
-                   username=interaction.user.display_name,
-                   guild_id=str(interaction.guild.id) if interaction.guild else None,
-                   is_professor=is_professor(interaction),
-                   operation="command_success")
+
     except Exception as e:
-        logger.error(f"❌ Error en comando /help: {e}",
-                    command="help",
-                    user_id=str(interaction.user.id),
-                    username=interaction.user.display_name,
-                    guild_id=str(interaction.guild.id) if interaction.guild else None,
-                    error_type=type(e).__name__,
-                    error_message=str(e))
-        
-        # Usar followup porque ya hicimos defer
+        logger.error(f"❌ Error in /help: {e}")
         try:
             await interaction.followup.send("❌ Error calling help.", ephemeral=True)
         except Exception:
-            pass  # Si falla, al menos tenemos el log
+            pass
 
 keep_alive()
 bot.run(os.getenv("DISCORD_TOKEN"))
