@@ -23,6 +23,21 @@ def get_user_xp(user_id: str, guild_id: str):
         return data.get("xp", 0), data.get("level", 1)
     return 0, 1
 
+def get_user_xp_by_name(user_name: str, guild_id: str):
+    user_docs = (
+        db.collection("servers").document(guild_id).collection("users")
+        .where("name", "==", user_name)
+        .limit(1)
+        .get()
+    )
+
+    if not user_docs:
+        return 0, 1
+
+    data = user_docs[0].to_dict()
+
+    return data.get("xp", 0), data.get("level", 1)
+
 def get_leaderboard(guild_id: str, limit: int = 10):
     users = db.collection("servers").document(guild_id).collection("users").order_by("xp", direction=firestore.Query.DESCENDING).limit(limit).stream()
     return [(u.id, u.to_dict().get("xp", 0), u.to_dict().get("level", 1)) for u in users]

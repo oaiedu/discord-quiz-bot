@@ -5,7 +5,7 @@ import discord
 from discord.ui import View, Button
 from firebase_admin import firestore
 
-from repositories.level_repository import get_leaderboard, get_user_xp
+from repositories.level_repository import get_leaderboard, get_user_xp, get_user_xp_by_name
 from repositories.question_repository import update_question_stats
 from repositories.server_repository import update_server_last_interaction
 from repositories.stats_repository import save_statistic
@@ -30,7 +30,8 @@ def register(tree: app_commands.CommandTree):
 
     @tree.command(name="my_rank", description="Mostra seu XP e nível")
     async def personal_rank(interaction: discord.Interaction):
-        xp, level = get_user_xp(str(interaction.user.id), str(interaction.guild.id))
+        xp, level = get_user_xp(str(interaction.user.id),
+                                str(interaction.guild.id))
 
         xp_for_next = 100 * level
         xp_current_level = xp - (100 * (level - 1))
@@ -44,23 +45,46 @@ def register(tree: app_commands.CommandTree):
             ephemeral=True
         )
 
-    @tree.command(name="user_rank", description="Display the user specified rank")
+    @tree.command(name="user_rank", description="Display the specified user's rank")
     @app_commands.describe(user_name="User full name")
     async def user_rank(interaction: discord.Interaction, user_name: str):
         try:
             update_last_interaction(interaction.guild.id)
-            
+
             if not is_professor(interaction):
-                await interaction.followup.send("⛔ This command is for professors only.", ephemeral=True)
-                logger.warning(f"❌ Unauthorized user attempted /generate_questions: {interaction.user.display_name}",
-                            command="generate_questions",
-                            user_id=str(interaction.user.id),
-                            username=interaction.user.display_name,
-                            guild_id=str(
-                                interaction.guild.id) if interaction.guild else None,
-                            operation="permission_denied")
+                await interaction.response.send_message(
+                    "⛔ This command is for professors only.", ephemeral=True
+                )
+                logger.warning(
+                    f"❌ Unauthorized user attempted /user_rank: {interaction.user.display_name}",
+                    command="user_rank",
+                    user_id=str(interaction.user.id),
+                    username=interaction.user.display_name,
+                    guild_id=str(
+                        interaction.guild.id) if interaction.guild else None,
+                    operation="permission_denied"
+                )
                 return
-                
+
+            xp, level = get_user_xp_by_name(
+                user_name, str(interaction.guild.id))
+
+            xp_for_next = 100 * level
+            xp_current_level = xp - (100 * (level - 1))
+            percent = int((xp_current_level / xp_for_next)
+                          * 10)
+            bar = "🔵" * percent + "⚪" * (10 - percent)
+
+            await interaction.response.send_message(
+                f"📊 Rank de **{user_name}**\n"
+                f"Nível {level} ({xp_current_level}/{xp_for_next} XP)\n"
+                f"{bar}",
+                ephemeral=True
+            )
+
         except Exception as e:
-            logging.error(f"Error during quiz: {e}")
-            await interaction.response.send_message("❌ An error occurred during the quiz.", ephemeral=True)
+            logging.error(f"Error during /user_rank: {e}")
+            await interaction.response.send_message(
+                "❌ An error occurred while fetching the user's rank.",
+                ephemeral=True
+            )
