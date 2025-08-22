@@ -17,33 +17,87 @@ from utils.utils import autocomplete_topics, is_professor, register_user_statist
 
 def register(tree: app_commands.CommandTree):
 
-    @tree.command(name="rank", description="Mostra o top XP do servidor")
+    @tree.command(name="rank", description="Show the top XP leaderboard in the server")
     async def global_rank(interaction: discord.Interaction):
-        leaderboard = get_leaderboard(str(interaction.guild.id), limit=5)
+        try:
+            update_last_interaction(interaction.guild.id)
 
-        msg = "🏆 **Leaderboard**\n"
-        for idx, (user_id, xp, level) in enumerate(leaderboard, start=1):
-            user = await interaction.guild.fetch_member(user_id)
-            msg += f"{idx}. {user.display_name} — {xp} XP (Nível {level})\n"
+            leaderboard = get_leaderboard(str(interaction.guild.id), limit=5)
 
-        await interaction.response.send_message(msg)
+            msg = "🏆 **Leaderboard**\n"
+            for idx, (user_id, xp, level) in enumerate(leaderboard, start=1):
+                user = await interaction.guild.fetch_member(user_id)
+                msg += f"{idx}. {user.display_name} — {xp} XP (Level {level})\n"
 
-    @tree.command(name="my_rank", description="Mostra seu XP e nível")
+            await interaction.response.send_message(msg)
+
+            logger.info(
+                f"✅ /rank executed by {interaction.user.display_name}",
+                command="rank",
+                user_id=str(interaction.user.id),
+                username=interaction.user.display_name,
+                guild_id=str(
+                    interaction.guild.id) if interaction.guild else None,
+                operation="command_execution"
+            )
+        except Exception as e:
+            logger.error(
+                f"❌ Error during /rank: {e}",
+                command="rank",
+                user_id=str(interaction.user.id),
+                guild_id=str(
+                    interaction.guild.id) if interaction.guild else None,
+                error_type=type(e).__name__,
+                operation="command_error"
+            )
+            await interaction.response.send_message(
+                "❌ An error occurred while fetching the leaderboard.",
+                ephemeral=True
+            )
+
+    @tree.command(name="my_rank", description="Show your XP and level")
     async def personal_rank(interaction: discord.Interaction):
-        xp, level = get_user_xp(str(interaction.user.id),
-                                str(interaction.guild.id))
+        try:
+            update_last_interaction(interaction.guild.id)
 
-        xp_for_next = 100 * level
-        xp_current_level = xp - (100 * (level - 1))
-        percent = int((xp_current_level / 100) * 10)
-        bar = "🔵" * percent + "⚪" * (10 - percent)
+            xp, level = get_user_xp(
+                str(interaction.user.id), str(interaction.guild.id))
 
-        await interaction.response.send_message(
-            f"**{interaction.user.display_name}**\n"
-            f"Nível {level} ({xp_current_level}/{100}) XP\n"
-            f"{bar}",
-            ephemeral=True
-        )
+            xp_for_next = 100 * level
+            xp_current_level = xp - (100 * (level - 1))
+            percent = int((xp_current_level / 100) * 10)
+            bar = "🔵" * percent + "⚪" * (10 - percent)
+
+            await interaction.response.send_message(
+                f"**{interaction.user.display_name}**\n"
+                f"Level {level} ({xp_current_level}/{100} XP)\n"
+                f"{bar}",
+                ephemeral=True
+            )
+
+            logger.info(
+                f"✅ /my_rank executed by {interaction.user.display_name}",
+                command="my_rank",
+                user_id=str(interaction.user.id),
+                username=interaction.user.display_name,
+                guild_id=str(
+                    interaction.guild.id) if interaction.guild else None,
+                operation="command_execution"
+            )
+        except Exception as e:
+            logger.error(
+                f"❌ Error during /my_rank: {e}",
+                command="my_rank",
+                user_id=str(interaction.user.id),
+                guild_id=str(
+                    interaction.guild.id) if interaction.guild else None,
+                error_type=type(e).__name__,
+                operation="command_error"
+            )
+            await interaction.response.send_message(
+                "❌ An error occurred while fetching your rank.",
+                ephemeral=True
+            )
 
     @tree.command(name="user_rank", description="Display the specified user's rank")
     @app_commands.describe(user_name="User full name")
@@ -71,19 +125,36 @@ def register(tree: app_commands.CommandTree):
 
             xp_for_next = 100 * level
             xp_current_level = xp - (100 * (level - 1))
-            percent = int((xp_current_level / xp_for_next)
-                          * 10)
+            percent = int((xp_current_level / xp_for_next) * 10)
             bar = "🔵" * percent + "⚪" * (10 - percent)
 
             await interaction.response.send_message(
-                f"📊 Rank de **{user_name}**\n"
-                f"Nível {level} ({xp_current_level}/{xp_for_next} XP)\n"
+                f"📊 Rank of **{user_name}**\n"
+                f"Level {level} ({xp_current_level}/{xp_for_next} XP)\n"
                 f"{bar}",
                 ephemeral=True
             )
 
+            logger.info(
+                f"✅ /user_rank executed by {interaction.user.display_name} for {user_name}",
+                command="user_rank",
+                user_id=str(interaction.user.id),
+                username=interaction.user.display_name,
+                target_user=user_name,
+                guild_id=str(
+                    interaction.guild.id) if interaction.guild else None,
+                operation="command_execution"
+            )
         except Exception as e:
-            logging.error(f"Error during /user_rank: {e}")
+            logger.error(
+                f"❌ Error during /user_rank: {e}",
+                command="user_rank",
+                user_id=str(interaction.user.id),
+                guild_id=str(
+                    interaction.guild.id) if interaction.guild else None,
+                error_type=type(e).__name__,
+                operation="command_error"
+            )
             await interaction.response.send_message(
                 "❌ An error occurred while fetching the user's rank.",
                 ephemeral=True
