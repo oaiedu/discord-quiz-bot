@@ -48,9 +48,9 @@ class QuizView(View):
 def register(tree: app_commands.CommandTree):
 
     @tree.command(name="quiz", description="Take a quiz with 5 questions on a topic")
-    @app_commands.describe(topic_name="Topic name")
-    @app_commands.autocomplete(topic_name=autocomplete_topics)
-    async def quiz(interaction: discord.Interaction, topic_name: str):
+    @app_commands.describe(nombre_topico="Topic name")
+    @app_commands.autocomplete(nombre_topico=autocomplete_topics)
+    async def quiz(interaction: discord.Interaction, nombre_topico: str):
         # Immediate defer to avoid Discord 3-second timeout
         await interaction.response.defer(thinking=True, ephemeral=True)
 
@@ -64,7 +64,7 @@ def register(tree: app_commands.CommandTree):
                     guild_name=interaction.guild.name if interaction.guild else None,
                     channel_id=str(
                         interaction.channel.id) if interaction.channel else None,
-                    topic=topic_name,
+                    topic=nombre_topico,
                     operation="command_execution")
 
         try:
@@ -72,20 +72,20 @@ def register(tree: app_commands.CommandTree):
                 update_server_last_interaction(interaction.guild.id)
 
             questions_data = get_questions_by_topic(
-                interaction.guild.id, topic_name)
+                interaction.guild.id, nombre_topico)
 
             if not questions_data:
                 await interaction.followup.send(
-                    f"❌ There are no questions registered for the topic `{topic_name}`.",
+                    f"❌ There are no questions registered for the topic `{nombre_topico}`.",
                     ephemeral=True
                 )
-                logger.warning(f"❌ No questions found for topic: {topic_name}",
+                logger.warning(f"❌ No questions found for topic: {nombre_topico}",
                                command="quiz",
                                user_id=str(interaction.user.id),
                                username=interaction.user.display_name,
                                guild_id=str(
                                    interaction.guild.id) if interaction.guild else None,
-                               topic=topic_name,
+                               topic=nombre_topico,
                                operation="no_questions_found")
                 return
 
@@ -157,7 +157,7 @@ def register(tree: app_commands.CommandTree):
                                 username=interaction.user.display_name,
                                 guild_id=str(
                                     interaction.guild.id) if interaction.guild else None,
-                                topic=topic_name,
+                                topic=nombre_topico,
                                 question_number=idx + 1,
                                 operation="question_timeout")
                     return
@@ -183,9 +183,9 @@ def register(tree: app_commands.CommandTree):
             type_list = list(question_types)
 
             register_user_statistics(
-                interaction.user, topic_name, correct_count, len(questions), type_list)
+                interaction.user, nombre_topico, correct_count, len(questions), type_list)
             save_statistic(interaction.guild.id, interaction.user,
-                           topic_name, correct_count, len(questions))
+                           nombre_topico, correct_count, len(questions))
 
             xp_gain = correct_count - (len(questions) - correct_count)
             final_xp = add_xp(str(interaction.user.id),
@@ -205,7 +205,7 @@ def register(tree: app_commands.CommandTree):
                         username=interaction.user.display_name,
                         guild_id=str(
                             interaction.guild.id) if interaction.guild else None,
-                        topic=topic_name,
+                        topic=nombre_topico,
                         score=f"{correct_count}/{len(questions)}",
                         questions_count=len(questions),
                         operation="command_success")
@@ -217,7 +217,7 @@ def register(tree: app_commands.CommandTree):
                          username=interaction.user.display_name,
                          guild_id=str(
                              interaction.guild.id) if interaction.guild else None,
-                         topic=topic_name,
+                         topic=nombre_topico,
                          error_type=type(e).__name__,
                          error_message=str(e),
                          operation="command_error")
