@@ -3,6 +3,7 @@ import discord
 from discord import Interaction, app_commands
 from typing import List, Union
 
+from utils.structured_logging import structured_logger as logger
 from repositories.topic_repository import get_topics_by_server
 from repositories.user_repository import register_user_history
 from repositories.server_repository import update_server_last_interaction
@@ -28,11 +29,16 @@ def get_topics_for_autocomplete(guild_id: int):
 
 
 async def autocomplete_topics(interaction: discord.Interaction, current: str):
-    topics = get_topics_for_autocomplete(interaction.guild.id)
-    return [
-        app_commands.Choice(name=topic, value=topic)
-        for topic in topics if current.lower() in topic.lower()
-    ][:25]
+    try:
+        topics = get_topics_for_autocomplete(interaction.guild.id) or []
+        return [
+            app_commands.Choice(name=topic, value=topic)
+            for topic in topics if current.lower() in topic.lower()
+        ][:25]
+    except Exception as e:
+        logger.error(f"❌ Error in autocomplete_topics: {e}", exc_info=True)
+        print(f"❌ Error in autocomplete_topics: {e}")
+        return []
 
 
 async def autocomplete_question_type(
