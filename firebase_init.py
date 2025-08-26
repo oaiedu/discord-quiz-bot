@@ -5,7 +5,7 @@ import json
 from google.cloud import secretmanager
 
 def get_firebase_credentials():
-    """Obtém credenciais do Firebase (Secret Manager ou padrão do GCP)."""
+    """Gets Firebase credentials (from Secret Manager or GCP default)."""
     
     if os.getenv("ENVIRONMENT", "local") == "local" and os.path.exists("firebase_config.json"):
         return credentials.Certificate("firebase_config.json")
@@ -13,7 +13,7 @@ def get_firebase_credentials():
     try:
         project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
         if not project_id:
-            raise ValueError("GOOGLE_CLOUD_PROJECT env var not set")
+            raise ValueError("GOOGLE_CLOUD_PROJECT environment variable not set")
         
         client = secretmanager.SecretManagerServiceClient()
         secret_name = f"projects/{project_id}/secrets/firebase-config/versions/latest"
