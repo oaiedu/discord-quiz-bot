@@ -30,16 +30,17 @@ def register(tree: app_commands.CommandTree):
 
             if not is_professor(interaction):
                 logger.warning("Access denied - non-professor attempted to use stats command",
-                               command="stats",
-                               user_id=str(interaction.user.id),
-                               username=interaction.user.name,
-                               guild_id=str(interaction.guild.id),
-                               operation="access_denied")
+                            command="stats",
+                            user_id=str(interaction.user.id),
+                            username=interaction.user.name,
+                            guild_id=str(interaction.guild.id),
+                            operation="access_denied")
                 await interaction.response.send_message("⛔ This command is only available to professors.", ephemeral=True)
                 return
 
-            data = stats_repository.get_statistics_by_server(
-                interaction.guild.id)
+            await interaction.response.defer(thinking=True, ephemeral=True)
+
+            data = stats_repository.get_statistics_by_server(interaction.guild.id)
 
             if not data:
                 logger.info("No statistics available for guild",
@@ -48,12 +49,11 @@ def register(tree: app_commands.CommandTree):
                             username=interaction.user.name,
                             guild_id=str(interaction.guild.id),
                             operation="no_stats_found")
-                await interaction.response.send_message("📂 No statistics recorded yet.")
+                await interaction.followup.send("📂 No statistics recorded yet.", ephemeral=True)
                 return
 
             user_count = len(data)
-            total_attempts = sum(len(info['attempts'])
-                                 for info in data.values())
+            total_attempts = sum(len(info['attempts']) for info in data.values())
 
             summary = "📊 **Bot usage statistics:**\n"
             for uid, info in data.items():
@@ -73,29 +73,27 @@ def register(tree: app_commands.CommandTree):
                         user_count=user_count,
                         total_attempts=total_attempts)
 
-            await interaction.response.send_message(summary)
+            await interaction.followup.send(summary, ephemeral=True)
+
         except Exception as e:
             logger.error("Error in stats command",
-                         command="stats",
-                         user_id=str(interaction.user.id),
-                         username=interaction.user.name,
-                         guild_id=str(interaction.guild.id),
-                         guild_name=interaction.guild.name,
-                         channel_id=str(interaction.channel.id),
-                         is_professor=is_professor(interaction),
-                         operation="command_error",
-                         error_type=type(e).__name__,
-                         error_message=str(e))
+                        command="stats",
+                        user_id=str(interaction.user.id),
+                        username=interaction.user.name,
+                        guild_id=str(interaction.guild.id),
+                        guild_name=interaction.guild.name,
+                        channel_id=str(interaction.channel.id),
+                        is_professor=is_professor(interaction),
+                        operation="command_error",
+                        error_type=type(e).__name__,
+                        error_message=str(e))
             logging.error(f"Error retrieving statistics: {e}")
 
             try:
-                if not interaction.response.is_done():
-                    await interaction.response.send_message("❌ Error retrieving statistics.")
-                else:
-                    await interaction.followup.send("❌ Error retrieving statistics.", ephemeral=True)
+                await interaction.followup.send("❌ Error retrieving statistics.", ephemeral=True)
             except Exception:
                 logging.error("Failed to send error message to user")
-
+            
     @tree.command(name="user_stats", description="Shows a summary of quiz attempts per user (professors only)")
     async def user_stats(interaction: discord.Interaction):
         logger.info("Command execution started",
@@ -121,6 +119,9 @@ def register(tree: app_commands.CommandTree):
                 await interaction.response.send_message("⛔ This command is only available to professors.", ephemeral=True)
                 return
 
+            # Defer early, since we're doing heavy processing
+            await interaction.response.defer(thinking=True, ephemeral=True)
+
             data = stats_repository.get_statistics_by_server(
                 interaction.guild.id)
 
@@ -131,7 +132,7 @@ def register(tree: app_commands.CommandTree):
                             username=interaction.user.name,
                             guild_id=str(interaction.guild.id),
                             operation="no_stats_found")
-                await interaction.response.send_message("📂 No statistics recorded yet.")
+                await interaction.followup.send("📂 No statistics recorded yet.", ephemeral=True)
                 return
 
             names = []
@@ -203,9 +204,10 @@ def register(tree: app_commands.CommandTree):
                         user_count=user_count,
                         total_attempts=total_attempts)
 
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 content="📊 Quiz attempts per user (each bar segment = one attempt):",
-                file=File(fp=buf, filename="user_stats_stacked.png")
+                file=File(fp=buf, filename="user_stats_stacked.png"),
+                ephemeral=True
             )
 
         except Exception as e:
@@ -223,10 +225,7 @@ def register(tree: app_commands.CommandTree):
             logging.error(f"Error generating user_stats graph: {e}")
 
             try:
-                if not interaction.response.is_done():
-                    await interaction.response.send_message("❌ Error retrieving statistics.")
-                else:
-                    await interaction.followup.send("❌ Error retrieving statistics.", ephemeral=True)
+                await interaction.followup.send("❌ Error retrieving statistics.", ephemeral=True)
             except Exception:
                 logging.error("Failed to send error message to user")
 
@@ -247,13 +246,15 @@ def register(tree: app_commands.CommandTree):
 
             if not is_professor(interaction):
                 logger.warning("Access denied - non-professor attempted to use time_stats command",
-                               command="time_stats",
-                               user_id=str(interaction.user.id),
-                               username=interaction.user.name,
-                               guild_id=str(interaction.guild.id),
-                               operation="access_denied")
+                            command="time_stats",
+                            user_id=str(interaction.user.id),
+                            username=interaction.user.name,
+                            guild_id=str(interaction.guild.id),
+                            operation="access_denied")
                 await interaction.response.send_message("⛔ This command is only available to professors.", ephemeral=True)
                 return
+
+            await interaction.response.defer(thinking=True, ephemeral=True)
 
             temporal_data = quiz_repository.get_quizzes_by_period(
                 interaction.guild.id)
@@ -265,7 +266,7 @@ def register(tree: app_commands.CommandTree):
                             username=interaction.user.name,
                             guild_id=str(interaction.guild.id),
                             operation="no_temporal_stats_found")
-                await interaction.response.send_message("📂 No statistics recorded yet.")
+                await interaction.followup.send("📂 No statistics recorded yet.", ephemeral=True)
                 return
 
             dates = list(temporal_data.keys())
@@ -303,26 +304,27 @@ def register(tree: app_commands.CommandTree):
                         total_periods=total_periods,
                         total_quizzes=total_quizzes)
 
-            await interaction.response.send_message("📈 Statistics over time:", file=discord.File(fp=buf, filename="time_stats.png"))
+            await interaction.followup.send(
+                "📈 Statistics over time:",
+                file=discord.File(fp=buf, filename="time_stats.png"),
+                ephemeral=True
+            )
 
         except Exception as e:
             logger.error("Error in time_stats command",
-                         command="time_stats",
-                         user_id=str(interaction.user.id),
-                         username=interaction.user.name,
-                         guild_id=str(interaction.guild.id),
-                         guild_name=interaction.guild.name,
-                         channel_id=str(interaction.channel.id),
-                         is_professor=is_professor(interaction),
-                         operation="command_error",
-                         error_type=type(e).__name__,
-                         error_message=str(e))
+                        command="time_stats",
+                        user_id=str(interaction.user.id),
+                        username=interaction.user.name,
+                        guild_id=str(interaction.guild.id),
+                        guild_name=interaction.guild.name,
+                        channel_id=str(interaction.channel.id),
+                        is_professor=is_professor(interaction),
+                        operation="command_error",
+                        error_type=type(e).__name__,
+                        error_message=str(e))
             logging.error(f"Error retrieving time statistics: {e}")
 
             try:
-                if not interaction.response.is_done():
-                    await interaction.response.send_message(f"❌ Error retrieving statistics. {e}")
-                else:
-                    await interaction.followup.send(f"❌ Error retrieving statistics. {e}", ephemeral=True)
+                await interaction.followup.send(f"❌ Error retrieving statistics. {e}", ephemeral=True)
             except Exception:
                 logging.error("Failed to send error message to user")
