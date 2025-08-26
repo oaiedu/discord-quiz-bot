@@ -7,12 +7,10 @@ from google.cloud import secretmanager
 def get_firebase_credentials():
     """Obtém credenciais do Firebase (Secret Manager ou padrão do GCP)."""
     
-    # Ambiente local → usar arquivo firebase_config.json se existir
     if os.getenv("ENVIRONMENT", "local") == "local" and os.path.exists("firebase_config.json"):
         return credentials.Certificate("firebase_config.json")
     
     try:
-        # Produção (Cloud Run) → Secret Manager
         project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
         if not project_id:
             raise ValueError("GOOGLE_CLOUD_PROJECT env var not set")
