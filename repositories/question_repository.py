@@ -14,13 +14,14 @@ def list_questions_by_topic(guild_id: int, topic: str):
         if not topic_ref:
             return []
 
-        questions_ref = topic_ref[0].reference.collection(
-            "questions").order_by("question").get()
-        return [doc.to_dict() | {"id": doc.id} for doc in questions_ref]
+        questions_ref = topic_ref[0].reference.collection("questions").get()
+        questions = [{**doc.to_dict(), "id": doc.id} for doc in questions_ref]
+        questions.sort(key=lambda q: q.get("question", ""))
+
+        return questions
 
     except Exception as e:
-        logging.error(
-            f"Error listing questions for topic '{topic}' in server {guild_id}: {e}")
+        logging.error(f"Error listing questions for topic '{topic}' in server {guild_id}: {e}")
         return []
 
 
