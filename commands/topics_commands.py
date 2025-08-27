@@ -12,12 +12,10 @@ from utils.llm_utils import generate_questions_from_pdf
 DOCS_PATH = "docs"
 
 # Function to save PDF to storage
-
-
 async def save_pdf(interaction: Interaction, file: discord.Attachment, topic_name: str):
     try:
         if not is_professor(interaction):
-            await interaction.response.send_message("⛔ This command is only available to professors.", ephemeral=True)
+            await interaction.followup.send("⛔ This command is only available to professors.", ephemeral=True)
             return
 
         if not file.filename.endswith(".pdf"):
@@ -32,7 +30,7 @@ async def save_pdf(interaction: Interaction, file: discord.Attachment, topic_nam
         print(pdf_url)
 
         if not pdf_url:
-            await interaction.response.send_message("❌ No topics available yet.", ephemeral=True)
+            await interaction.followup.send("❌ No topics available yet.", ephemeral=True)
 
         if os.path.exists(pdf_path):
             os.remove(pdf_path)
@@ -117,10 +115,7 @@ def register(tree: app_commands.CommandTree):
             logging.error(f"Error loading topics: {e}")
 
             try:
-                if not interaction.response.is_done():
-                    await interaction.response.send_message("❌ Error loading topics.")
-                else:
-                    await interaction.followup.send("❌ Error loading topics.", ephemeral=True)
+                await interaction.followup.send("❌ Error loading topics.", ephemeral=True)
             except:
                 logging.error("Failed to send error message to user")
 

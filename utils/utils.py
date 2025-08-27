@@ -41,6 +41,12 @@ async def autocomplete_topics(interaction: discord.Interaction, current: str):
         return []
 
 
+async def autocomplete_TF(interaction, current: str):
+    return [
+        app_commands.Choice(name="T", value="T"),
+        app_commands.Choice(name="F", value="F"),
+    ]
+
 async def autocomplete_question_type(
     interaction: Interaction,
     current: str,

@@ -48,9 +48,9 @@ class QuizView(View):
 def register(tree: app_commands.CommandTree):
 
     @tree.command(name="quiz", description="Take a quiz with 5 questions on a topic")
-    @app_commands.describe(nombre_topico="Topic name")
-    @app_commands.autocomplete(nombre_topico=autocomplete_topics)
-    async def quiz(interaction: discord.Interaction, nombre_topico: str):
+    @app_commands.describe(topic_name="Topic name")
+    @app_commands.autocomplete(topic_name=autocomplete_topics)
+    async def quiz(interaction: discord.Interaction, topic_name: str):
         # Immediate defer to avoid Discord 3-second timeout
         await interaction.response.defer(thinking=True, ephemeral=True)
 
@@ -64,7 +64,7 @@ def register(tree: app_commands.CommandTree):
                     guild_name=interaction.guild.name if interaction.guild else None,
                     channel_id=str(
                         interaction.channel.id) if interaction.channel else None,
-                    topic=nombre_topico,
+                    topic=topic_name,
                     operation="command_execution")
 
         try:
@@ -72,20 +72,20 @@ def register(tree: app_commands.CommandTree):
                 update_server_last_interaction(interaction.guild.id)
 
             questions_data = get_questions_by_topic(
-                interaction.guild.id, nombre_topico)
+                interaction.guild.id, topic_name)
 
             if not questions_data:
                 await interaction.followup.send(
-                    f"❌ There are no questions registered for the topic `{nombre_topico}`.",
+                    f"❌ There are no questions registered for the topic `{topic_name}`.",
                     ephemeral=True
                 )
-                logger.warning(f"❌ No questions found for topic: {nombre_topico}",
+                logger.warning(f"❌ No questions found for topic: {topic_name}",
                                command="quiz",
                                user_id=str(interaction.user.id),
                                username=interaction.user.display_name,
                                guild_id=str(
                                    interaction.guild.id) if interaction.guild else None,
-                               topic=nombre_topico,
+                               topic=topic_name,
                                operation="no_questions_found")
                 return
 
@@ -157,7 +157,7 @@ def register(tree: app_commands.CommandTree):
                                 username=interaction.user.display_name,
                                 guild_id=str(
                                     interaction.guild.id) if interaction.guild else None,
-                                topic=nombre_topico,
+                                topic=topic_name,
                                 question_number=idx + 1,
                                 operation="question_timeout")
                     return
@@ -183,20 +183,20 @@ def register(tree: app_commands.CommandTree):
             type_list = list(question_types)
 
             register_user_statistics(
-                interaction.user, nombre_topico, correct_count, len(questions), type_list)
+                interaction.user, topic_name, correct_count, len(questions), type_list)
             save_statistic(interaction.guild.id, interaction.user,
-                           nombre_topico, correct_count, len(questions))
+                           topic_name, correct_count, len(questions))
 
             xp_gain = correct_count - (len(questions) - correct_count)
             final_xp = add_xp(str(interaction.user.id),
                               str(interaction.guild.id), xp_gain)
             await interaction.followup.send(
-                f"✨ Você ganhou {xp_gain} XP! Seu total agora é {final_xp} XP.", ephemeral=True)
+                f"✨ You gained {xp_gain} XP! Your total is now {final_xp} XP.", ephemeral=True)
 
             streak = update_streak(str(interaction.user.id), str(
                 interaction.guild.id), correct_count == len(questions))
             if streak >= 3:
-                await interaction.followup.send(f"🔥 Você está em streak! ({streak} seguidas)", ephemeral=True)
+                await interaction.followup.send(f"🔥 You're on a streak! ({streak} in a row)", ephemeral=True)
 
             # Log command success
             logger.info(f"✅ Command /quiz successfully completed for {interaction.user.display_name}",
@@ -205,7 +205,7 @@ def register(tree: app_commands.CommandTree):
                         username=interaction.user.display_name,
                         guild_id=str(
                             interaction.guild.id) if interaction.guild else None,
-                        topic=nombre_topico,
+                        topic=topic_name,
                         score=f"{correct_count}/{len(questions)}",
                         questions_count=len(questions),
                         operation="command_success")
@@ -217,7 +217,7 @@ def register(tree: app_commands.CommandTree):
                          username=interaction.user.display_name,
                          guild_id=str(
                              interaction.guild.id) if interaction.guild else None,
-                         topic=nombre_topico,
+                         topic=topic_name,
                          error_type=type(e).__name__,
                          error_message=str(e),
                          operation="command_error")

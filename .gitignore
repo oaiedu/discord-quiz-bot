@@ -1,4 +1,8 @@
 .env
 
+preguntas.json
+questions.json
+
 firebase_config.json
 __pycache__/
+

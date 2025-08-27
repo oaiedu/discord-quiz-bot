@@ -6,7 +6,7 @@ from repositories.topic_repository import get_topic_by_name
 from utils.enum import QuestionType
 from utils.llm_utils import generate_questions_from_pdf
 from utils.structured_logging import structured_logger as logger
-from utils.utils import update_last_interaction, autocomplete_question_type, is_professor, autocomplete_topics
+from utils.utils import update_last_interaction, autocomplete_question_type, is_professor, autocomplete_topics, autocomplete_TF
 
 # Register commands
 
@@ -17,9 +17,9 @@ def register(tree: app_commands.CommandTree):
     @app_commands.describe(
         topic="Topic name",
         question="Question text",
-        answer="Correct answer (V or F)"
+        answer="Correct answer (T or F)"
     )
-    @app_commands.autocomplete(topic=autocomplete_topics)
+    @app_commands.autocomplete(topic=autocomplete_topics, answer=autocomplete_TF)
     async def add_question_command(interaction: Interaction, topic: str, question: str, answer: str):
         # Immediate defer to avoid Discord timeout (3 seconds)
         await interaction.response.defer(thinking=True, ephemeral=True)
@@ -52,7 +52,7 @@ def register(tree: app_commands.CommandTree):
                                operation="permission_denied")
                 return
 
-            if answer.upper() not in ["V", "F"]:
+            if answer.upper() not in ["T", "F"]:
                 await interaction.followup.send("❌ Answer must be 'V' or 'F'", ephemeral=True)
                 logger.warning(f"❌ Invalid answer in /add_question: {answer}",
                                command="add_question",
