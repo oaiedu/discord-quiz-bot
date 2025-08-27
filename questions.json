@@ -1,0 +1,209 @@
+{
+  "bio": [
+    {
+      "question": "Citologia é a ciência que estuda as células.",
+      "answer": "True",
+      "id": "1"
+    },
+    {
+      "question": "Uma célula é a maior unidade dos seres vivos.",
+      "answer": "False",
+      "id": "3"
+    },
+    {
+      "question": "Todas as células possuem um núcleo.",
+      "answer": "False",
+      "id": "5"
+    },
+    {
+      "question": "As células procariotas constituem organismos como plantas.",
+      "answer": "False",
+      "id": "7"
+    },
+    {
+      "question": "A principal diferença entre a célula procariota e a eucariota é a presença de um núcleo.",
+      "answer": "False",
+      "id": "9"
+    },
+    {
+      "question": "A membrana plasmática separe o meio interno citoplasmático do meio externo da célula eucariota.",
+      "answer": "False",
+      "id": "11"
+    },
+    {
+      "question": "O lado do fosfolipídio que tem afinidade com água é hidrofílico.",
+      "answer": "True",
+      "id": "13"
+    },
+    {
+      "question": "As bactérias possuem uma parede celular constituída por celulose.",
+      "answer": "False",
+      "id": "15"
+    },
+    {
+      "question": "A principal diferença entre a célula procariota e a eucariota é a ausência de núcleo nas procariotas.",
+      "answer": "True",
+      "id": "17"
+    },
+    {
+      "question": "O material genético circular fica imerso no citoplasma eucariótico.",
+      "answer": "False",
+      "id": "19"
+    },
+    {
+      "question": "Procariontes possuem uma molécula de DNA circular extra, denominada plasmídeo.",
+      "answer": "True",
+      "id": "21"
+    },
+    {
+      "question": "Algumas bactérias possuem fímbrias, que auxiliam na locomoção.",
+      "answer": "True",
+      "id": "23"
+    },
+    {
+      "question": "A membrana plasmática das células eucariotas não contém moléculas de colesterol.",
+      "answer": "False",
+      "id": "25"
+    },
+    {
+      "question": "A membrana plasmática de animais não contém proteínas.",
+      "answer": "False",
+      "id": "27"
+    },
+    {
+      "question": "As funções de tais proteínas encontradas na membrana plasmática são apenas transporte de substâncias.",
+      "answer": "False",
+      "id": "29"
+    },
+    {
+      "question": "Os carboidratos atuam apenas como marcadores celulares.",
+      "answer": "False",
+      "id": "31"
+    },
+    {
+      "question": "O grupo sanguíneo humano AB é composto por indivíduos com carboidratos presentes na superfície das células vermelhas que diferem entre si.",
+      "answer": "True",
+      "id": "33"
+    },
+    {
+      "question": "A membrana plasmática separe o meio interno citoplasmático do meio externo da célula eucariótica.",
+      "answer": "False",
+      "id": "35"
+    },
+    {
+      "question": "As células eucariotas não possuem um núcleo.",
+      "answer": "False",
+      "id": "37"
+    },
+    {
+      "question": "Os carboidratos presentes na membrana plasmática são apenas glicolipídios.",
+      "answer": "False",
+      "id": "39"
+    },
+    {
+      "question": "A membrana plasmática de bactérias não contém carboidratos.",
+      "answer": "False",
+      "id": "41"
+    },
+    {
+      "question": "As células procariotas são constituídas por membrana plasmática, material genético, citoplasma, ribossomos, glicogênio, proteínas e carboidratos.",
+      "answer": "True",
+      "id": "43"
+    },
+    {
+      "question": "As células eucariotas são constituídas por membrana plasmática, material genético, citoplasma, ribossomos, glicogênio, proteínas, carboidratos, parede celular e núcleo.",
+      "answer": "True",
+      "id": "45"
+    },
+    {
+      "question": "A membrana plasmática é constituída por uma camada de fosfolipídeos.",
+      "answer": "True",
+      "id": "47"
+    },
+    {
+      "question": "As células procariotas são notavelmente mais complexas do que as eucariotas.",
+      "answer": "False",
+      "id": "49"
+    },
+    {
+      "question": "Algumas bactérias possuem fímbrias, que auxiliam na adesão.",
+      "answer": "True",
+      "id": "51"
+    },
+    {
+      "question": "A membrana plasmática de algumas células eucariotas pode ser observada externamente.",
+      "answer": "False",
+      "id": "53"
+    },
+    {
+      "question": "A membrana plasmática de algumas células eucariotas não contém proteínas.",
+      "answer": "False",
+      "id": "55"
+    },
+    {
+      "question": "As células eucariotas são constituídas apenas por membrana plasmática, material genético, citoplasma e ribossomos.",
+      "answer": "False",
+      "id": "57"
+    },
+    {
+      "question": "As células procariotas possuem um núcleo.",
+      "answer": "False",
+      "id": "59"
+    },
+    {
+      "question": "A membrana plasmática de algumas células eucariotas não contém proteínas.",
+      "answer": "False",
+      "id": "61"
+    },
+    {
+      "question": "O material genético circular fica imerso no citoplasma procariótico.",
+      "answer": "False",
+      "id": "63"
+    },
+    {
+      "question": "A membrana plasmática separe o meio interno citoplasmático do meio externo da célula procariota.",
+      "answer": "True",
+      "id": "65"
+    },
+    {
+      "question": "Quase todos os procariontes possuem plasmídeos.",
+      "answer": "False",
+      "id": "67"
+    },
+    {
+      "question": "Os procariontes possuem uma parede celular do lado externo da membrana plasmática.",
+      "answer": "True",
+      "id": "69"
+    },
+    {
+      "question": "A membrana plasmática separe o meio interno citoplasmático do meio externo da célula eucariótica.",
+      "answer": "False",
+      "id": "71"
+    },
+    {
+      "question": "As bactérias possuem flagelos, que proporcionam a locomoção.",
+      "answer": "True",
+      "id": "73"
+    },
+    {
+      "question": "A membrana plasmática de algumas células eucariotas não contém carboidratos.",
+      "answer": "False",
+      "id": "75"
+    },
+    {
+      "question": "As células eucariotas são constituídas por membrana plasmática, material genético, citoplasma, ribossomos, glicogênio, proteínas e carboidratos.",
+      "answer": "True",
+      "id": "77"
+    },
+    {
+      "question": "As células procariotas são constituídas por membrana plasmática, material genético, citoplasma, ribossomos, glicogênio, proteínas, carboidratos, parede celular e núcleo.",
+      "answer": "False",
+      "id": "79"
+    },
+    {
+      "question": "O material genético circular fica imerso no citoplasma eucariótico.",
+      "answer": "True",
+      "id": "81"
+    }
+  ]
+}
