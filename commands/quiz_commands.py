@@ -51,21 +51,7 @@ def register(tree: app_commands.CommandTree):
     @app_commands.describe(topic_name="Topic name")
     @app_commands.autocomplete(topic_name=autocomplete_topics)
     async def quiz(interaction: discord.Interaction, topic_name: str):
-        # Immediate defer to avoid Discord 3-second timeout
         await interaction.response.defer(thinking=True, ephemeral=True)
-
-        # Log command execution
-        logger.info(f"🔍 Command /quiz executed by {interaction.user.display_name}",
-                    command="quiz",
-                    user_id=str(interaction.user.id),
-                    username=interaction.user.display_name,
-                    guild_id=str(
-                        interaction.guild.id) if interaction.guild else None,
-                    guild_name=interaction.guild.name if interaction.guild else None,
-                    channel_id=str(
-                        interaction.channel.id) if interaction.channel else None,
-                    topic=topic_name,
-                    operation="command_execution")
 
         try:
             if interaction.guild:
@@ -198,30 +184,7 @@ def register(tree: app_commands.CommandTree):
             if streak >= 3:
                 await interaction.followup.send(f"🔥 You're on a streak! ({streak} in a row)", ephemeral=True)
 
-            # Log command success
-            logger.info(f"✅ Command /quiz successfully completed for {interaction.user.display_name}",
-                        command="quiz",
-                        user_id=str(interaction.user.id),
-                        username=interaction.user.display_name,
-                        guild_id=str(
-                            interaction.guild.id) if interaction.guild else None,
-                        topic=topic_name,
-                        score=f"{correct_count}/{len(questions)}",
-                        questions_count=len(questions),
-                        operation="command_success")
-
         except Exception as e:
-            logger.error(f"❌ Error in /quiz command: {e}",
-                         command="quiz",
-                         user_id=str(interaction.user.id),
-                         username=interaction.user.display_name,
-                         guild_id=str(
-                             interaction.guild.id) if interaction.guild else None,
-                         topic=topic_name,
-                         error_type=type(e).__name__,
-                         error_message=str(e),
-                         operation="command_error")
-
             try:
                 await interaction.followup.send("❌ An error occurred during the quiz.", ephemeral=True)
             except Exception:

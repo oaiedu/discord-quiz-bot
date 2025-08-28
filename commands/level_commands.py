@@ -31,25 +31,8 @@ def register(tree: app_commands.CommandTree):
 
             await interaction.response.send_message(msg)
 
-            logger.info(
-                f"✅ /rank executed by {interaction.user.display_name}",
-                command="rank",
-                user_id=str(interaction.user.id),
-                username=interaction.user.display_name,
-                guild_id=str(
-                    interaction.guild.id) if interaction.guild else None,
-                operation="command_execution"
-            )
+
         except Exception as e:
-            logger.error(
-                f"❌ Error during /rank: {e}",
-                command="rank",
-                user_id=str(interaction.user.id),
-                guild_id=str(
-                    interaction.guild.id) if interaction.guild else None,
-                error_type=type(e).__name__,
-                operation="command_error"
-            )
             await interaction.response.send_message(
                 "❌ An error occurred while fetching the leaderboard.",
                 ephemeral=True
@@ -75,25 +58,7 @@ def register(tree: app_commands.CommandTree):
                 ephemeral=True
             )
 
-            logger.info(
-                f"✅ /my_rank executed by {interaction.user.display_name}",
-                command="my_rank",
-                user_id=str(interaction.user.id),
-                username=interaction.user.display_name,
-                guild_id=str(
-                    interaction.guild.id) if interaction.guild else None,
-                operation="command_execution"
-            )
         except Exception as e:
-            logger.error(
-                f"❌ Error during /my_rank: {e}",
-                command="my_rank",
-                user_id=str(interaction.user.id),
-                guild_id=str(
-                    interaction.guild.id) if interaction.guild else None,
-                error_type=type(e).__name__,
-                operation="command_error"
-            )
             await interaction.response.send_message(
                 "❌ An error occurred while fetching your rank.",
                 ephemeral=True
@@ -122,26 +87,7 @@ def register(tree: app_commands.CommandTree):
                 ephemeral=True
             )
 
-            logger.info(
-                f"✅ /user_rank executed by {interaction.user.display_name} for {user_name}",
-                command="user_rank",
-                user_id=str(interaction.user.id),
-                username=interaction.user.display_name,
-                target_user=user_name,
-                guild_id=str(
-                    interaction.guild.id) if interaction.guild else None,
-                operation="command_execution"
-            )
         except Exception as e:
-            logger.error(
-                f"❌ Error during /user_rank: {e}",
-                command="user_rank",
-                user_id=str(interaction.user.id),
-                guild_id=str(
-                    interaction.guild.id) if interaction.guild else None,
-                error_type=type(e).__name__,
-                operation="command_error"
-            )
             await interaction.response.send_message(
                 "❌ An error occurred while fetching the user's rank.",
                 ephemeral=True
