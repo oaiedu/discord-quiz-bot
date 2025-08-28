@@ -9,7 +9,7 @@ from utils.structured_logging import structured_logger as logger
 from commands import questions_commands, quiz_commands, stats_commands, topics_commands, level_commands
 from repositories.server_repository import register_server, deactivate_server, update_server_last_interaction
 from repositories.user_repository import register_single_user, register_guild_users
-from utils.utils import is_professor
+from utils.utils import is_professor, log_command_event
 
 load_dotenv()
 
@@ -27,7 +27,6 @@ class QuizBot(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        # ⚡ Substitua pelo ID do servidor onde você testa o bot
         GUILD_ID = int(os.getenv("DISCORD_GUILD_ID", "0"))
         if GUILD_ID:
             guild = discord.Object(id=GUILD_ID)
@@ -35,7 +34,6 @@ class QuizBot(discord.Client):
             await self.tree.sync(guild=guild)
             print(f"🌍 Slash commands synced to guild {GUILD_ID}.")
         else:
-            # fallback: sync global
             await self.tree.sync()
             print("🌍 Slash commands synced globally.")
 
@@ -50,7 +48,7 @@ level_commands.register(bot.tree)
 
 @bot.event
 async def on_ready():
-    print(f"\u2705 Bot connected as {bot.user}")
+    print(f"✅ Bot connected as {bot.user}")
 
 
 @bot.event
@@ -65,21 +63,30 @@ async def on_resumed():
 
 @bot.event
 async def on_guild_join(guild: discord.Guild):
-    logger.info(f"🆕 Bot added to server: {guild.name} (ID: {guild.id})",
-                guild_id=str(guild.id),
-                server_name=guild.name,
-                operation="bot_guild_join")
+    log_command_event(
+        "info", None,
+        f"🆕 Bot added to server: {guild.name} (ID: {guild.id})",
+        operation="bot_guild_join",
+        guild_id=str(guild.id),
+        guild_name=guild.name
+    )
     try:
         register_server(guild)
         register_guild_users(guild)
-        logger.info(f"📌 Server and users registered in Firestore: {guild.id}",
-                    guild_id=str(guild.id),
-                    operation="firestore_registration")
+        log_command_event(
+            "info", None,
+            f"📌 Server and users registered in Firestore: {guild.id}",
+            operation="firestore_registration",
+            guild_id=str(guild.id)
+        )
     except Exception as e:
-        logger.error(f"❌ Error registering server or users in Firestore: {e}",
-                     guild_id=str(guild.id),
-                     operation="firestore_registration",
-                     error_type=type(e).__name__)
+        log_command_event(
+            "error", None,
+            f"❌ Error registering server or users in Firestore: {e}",
+            operation="firestore_registration",
+            guild_id=str(guild.id),
+            error_type=type(e).__name__
+        )
 
     channel = discord.utils.find(
         lambda c: c.permissions_for(
@@ -96,20 +103,26 @@ async def on_guild_join(guild: discord.Guild):
 
 @bot.event
 async def on_member_join(member: discord.Member):
-    logger.info(f"👤 New user joined: {member.name} (ID: {member.id}) in server {member.guild.name}",
-                user_id=str(member.id),
-                guild_id=str(member.guild.id),
-                username=member.name,
-                operation="member_join")
+    log_command_event(
+        "info", None,
+        f"👤 New user joined: {member.name} (ID: {member.id}) in server {member.guild.name}",
+        operation="member_join",
+        user_id=str(member.id),
+        guild_id=str(member.guild.id),
+        username=member.name
+    )
 
     try:
         register_single_user(member.guild, member)
     except Exception as e:
-        logger.error(f"❌ Error registering new user {member.id}: {e}",
-                     user_id=str(member.id),
-                     guild_id=str(member.guild.id),
-                     operation="user_registration",
-                     error_type=type(e).__name__)
+        log_command_event(
+            "error", None,
+            f"❌ Error registering new user {member.id}: {e}",
+            operation="user_registration",
+            user_id=str(member.id),
+            guild_id=str(member.guild.id),
+            error_type=type(e).__name__
+        )
 
     channel = discord.utils.find(
         lambda c: c.permissions_for(
@@ -129,23 +142,66 @@ async def on_guild_remove(guild: discord.Guild):
         print(f"❌ Error updating server status {guild.id}: {e}")
 
 
+@bot.event
+async def on_app_command_completion(interaction: discord.Interaction, command: discord.app_commands.Command):
+    update_server_last_interaction(interaction.guild.id)
+    
+    print(f"✅ Comando {command.name} executado por {interaction.user} no servidor {interaction.guild.name}")
+
+    log_command_event(
+        "info",
+        interaction,
+        "✅ Command completed successfully",
+        operation="command_success"
+    )
+
+
+@bot.event
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    update_server_last_interaction(interaction.guild.id)
+    
+    print(f"❌ Erro no comando {interaction.command.name}: {error}")
+
+    log_command_event(
+        "error",
+        interaction,
+        "❌ Command execution failed",
+        operation="command_error",
+        error_type=type(error).__name__,
+        error_message=str(error)
+    )
+
+    try:
+        await interaction.response.send_message("⚠️ Ocorreu um erro ao executar este comando.", ephemeral=True)
+    except discord.InteractionResponded:
+        await interaction.followup.send("⚠️ Ocorreu um erro ao executar este comando.", ephemeral=True)
+
+
+@bot.tree.interaction_check
+async def global_command_check(interaction: discord.Interaction) -> bool:
+    print(f"📢 {interaction.user} called {interaction.command.name} in server {interaction.guild.name}")
+
+    log_command_event(
+        "info",
+        interaction,
+        "📢 Command called",
+        operation="command_execution"
+    )
+
+    update_server_last_interaction(interaction.guild.id)
+    return True
+
+
 @bot.tree.command(name="help", description="Explains how to use the bot and its available commands")
 async def help_command(interaction: discord.Interaction):
-    # Immediate DEFER to avoid Discord timeout (3 seconds)
     await interaction.response.defer(thinking=True, ephemeral=True)
 
-    # Log the executed command with user information
-    logger.info(f"🔍 Command /help executed by {interaction.user.display_name}",
-                command="help",
-                user_id=str(interaction.user.id),
-                username=interaction.user.display_name,
-                guild_id=str(
-                    interaction.guild.id) if interaction.guild else None,
-                guild_name=interaction.guild.name if interaction.guild else None,
-                channel_id=str(
-                    interaction.channel.id) if interaction.channel else None,
-                is_professor=is_professor(interaction),
-                operation="command_execution")
+    log_command_event(
+        "info",
+        interaction,
+        f"🔍 Command /help executed by {interaction.user.display_name}",
+        operation="command_execution"
+    )
 
     try:
         update_server_last_interaction(interaction.guild.id)
@@ -186,7 +242,14 @@ async def help_command(interaction: discord.Interaction):
         await interaction.followup.send(message, ephemeral=True)
 
     except Exception as e:
-        logger.error(f"❌ Error in /help: {e}")
+        log_command_event(
+            "error",
+            interaction,
+            f"❌ Error in /help: {e}",
+            operation="command_error",
+            error_type=type(e).__name__,
+            error_message=str(e)
+        )
         try:
             await interaction.followup.send("❌ Error calling help.", ephemeral=True)
         except Exception:

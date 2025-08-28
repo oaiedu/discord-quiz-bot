@@ -7,7 +7,7 @@ import discord
 
 from repositories import stats_repository, quiz_repository
 from repositories.server_repository import update_server_last_interaction
-from utils.utils import is_professor
+from utils.utils import is_professor, professor_verification
 from utils.structured_logging import structured_logger as logger
 
 
@@ -28,15 +28,7 @@ def register(tree: app_commands.CommandTree):
         try:
             update_server_last_interaction(interaction.guild.id)
 
-            if not is_professor(interaction):
-                logger.warning("Access denied - non-professor attempted to use stats command",
-                            command="stats",
-                            user_id=str(interaction.user.id),
-                            username=interaction.user.name,
-                            guild_id=str(interaction.guild.id),
-                            operation="access_denied")
-                await interaction.response.send_message("⛔ This command is only available to professors.", ephemeral=True)
-                return
+            professor_verification(interaction)
 
             await interaction.response.defer(thinking=True, ephemeral=True)
 
@@ -109,15 +101,7 @@ def register(tree: app_commands.CommandTree):
         try:
             update_server_last_interaction(interaction.guild.id)
 
-            if not is_professor(interaction):
-                logger.warning("Access denied - non-professor attempted to use user_stats command",
-                               command="user_stats",
-                               user_id=str(interaction.user.id),
-                               username=interaction.user.name,
-                               guild_id=str(interaction.guild.id),
-                               operation="access_denied")
-                await interaction.response.send_message("⛔ This command is only available to professors.", ephemeral=True)
-                return
+            professor_verification(interaction)
 
             # Defer early, since we're doing heavy processing
             await interaction.response.defer(thinking=True, ephemeral=True)
@@ -244,15 +228,7 @@ def register(tree: app_commands.CommandTree):
         try:
             update_server_last_interaction(interaction.guild.id)
 
-            if not is_professor(interaction):
-                logger.warning("Access denied - non-professor attempted to use time_stats command",
-                            command="time_stats",
-                            user_id=str(interaction.user.id),
-                            username=interaction.user.name,
-                            guild_id=str(interaction.guild.id),
-                            operation="access_denied")
-                await interaction.response.send_message("⛔ This command is only available to professors.", ephemeral=True)
-                return
+            professor_verification(interaction)
 
             await interaction.response.defer(thinking=True, ephemeral=True)
 
