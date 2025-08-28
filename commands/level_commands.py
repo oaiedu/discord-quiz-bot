@@ -12,7 +12,7 @@ from repositories.stats_repository import save_statistic
 from repositories.topic_repository import get_questions_by_topic
 from utils.enum import QuestionType
 from utils.structured_logging import structured_logger as logger
-from utils.utils import autocomplete_topics, is_professor, register_user_statistics, update_last_interaction
+from utils.utils import autocomplete_topics, is_professor, professor_verification, register_user_statistics, update_last_interaction
 
 
 def register(tree: app_commands.CommandTree):
@@ -105,20 +105,7 @@ def register(tree: app_commands.CommandTree):
         try:
             update_last_interaction(interaction.guild.id)
 
-            if not is_professor(interaction):
-                await interaction.response.send_message(
-                    "⛔ This command is for professors only.", ephemeral=True
-                )
-                logger.warning(
-                    f"❌ Unauthorized user attempted /user_rank: {interaction.user.display_name}",
-                    command="user_rank",
-                    user_id=str(interaction.user.id),
-                    username=interaction.user.display_name,
-                    guild_id=str(
-                        interaction.guild.id) if interaction.guild else None,
-                    operation="permission_denied"
-                )
-                return
+            professor_verification(interaction)
 
             xp, level = get_user_xp_by_name(
                 user_name, str(interaction.guild.id))

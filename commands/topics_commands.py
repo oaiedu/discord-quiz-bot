@@ -6,7 +6,7 @@ import os
 from repositories.topic_repository import create_topic_without_questions, get_topics_by_server, save_topic_pdf
 from utils.structured_logging import structured_logger as logger
 from utils.enum import QuestionType
-from utils.utils import update_last_interaction, is_professor
+from utils.utils import professor_verification, update_last_interaction, is_professor
 from utils.llm_utils import generate_questions_from_pdf
 
 DOCS_PATH = "docs"
@@ -14,9 +14,7 @@ DOCS_PATH = "docs"
 # Function to save PDF to storage
 async def save_pdf(interaction: Interaction, file: discord.Attachment, topic_name: str):
     try:
-        if not is_professor(interaction):
-            await interaction.followup.send("⛔ This command is only available to professors.", ephemeral=True)
-            return
+        professor_verification(interaction)
 
         if not file.filename.endswith(".pdf"):
             await interaction.followup.send("❌ Only PDF files are allowed.", ephemeral=True)
@@ -74,15 +72,7 @@ def register(tree: app_commands.CommandTree):
             update_last_interaction(interaction.guild.id)
             topics = get_topics_by_server(interaction.guild.id)
 
-            if not topics:
-                logger.info("No topics available for guild",
-                            command="topics",
-                            user_id=str(interaction.user.id),
-                            username=interaction.user.display_name,
-                            guild_id=str(interaction.guild.id),
-                            operation="no_topics_found")
-                await interaction.followup.send("❌ No topics available yet.")
-                return
+            professor_verification(interaction)
 
             topic_count = len(topics)
             topics_list = "\n".join(
@@ -144,16 +134,7 @@ def register(tree: app_commands.CommandTree):
         try:
             update_last_interaction(interaction.guild.id)
 
-            if not is_professor(interaction):
-                await interaction.followup.send("⛔ This command is only available to professors.", ephemeral=True)
-                logger.warning(f"❌ Non-professor attempted /upload_pdf: {interaction.user.display_name}",
-                               command="upload_pdf",
-                               user_id=str(interaction.user.id),
-                               username=interaction.user.display_name,
-                               guild_id=str(
-                                   interaction.guild.id) if interaction.guild else None,
-                               operation="permission_denied")
-                return
+            professor_verification(interaction)
 
             pdf_url = await save_pdf(interaction, file, topic_name)
 
@@ -228,16 +209,7 @@ def register(tree: app_commands.CommandTree):
         try:
             update_last_interaction(interaction.guild.id)
 
-            if not is_professor(interaction):
-                await interaction.followup.send("⛔ This command is only available to professors.", ephemeral=True)
-                logger.warning(f"❌ Non-professor attempted /upload_topic: {interaction.user.display_name}",
-                               command="upload_topic",
-                               user_id=str(interaction.user.id),
-                               username=interaction.user.display_name,
-                               guild_id=str(
-                                   interaction.guild.id) if interaction.guild else None,
-                               operation="permission_denied")
-                return
+            professor_verification(interaction)
 
             pdf_url = await save_pdf(interaction, file, topic_name)
 

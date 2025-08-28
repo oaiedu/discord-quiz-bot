@@ -77,3 +77,49 @@ def register_user_statistics(
         total=total,
         types=types,
     )
+    
+    
+def log_command_event(level: str, interaction, message: str, operation: str, **kwargs):
+    """
+    Centraliza o logging estruturado para comandos de slash.
+
+    Args:
+        level (str): Nível do log ("info", "error", "warning", "debug", "critical").
+        interaction (discord.Interaction): O objeto da interação do Discord.
+        message (str): Mensagem principal do log.
+        operation (str): Tipo de operação (ex.: "command_execution", "command_success", "command_error").
+        **kwargs: Campos extras opcionais (ex.: error_type, error_message).
+    """
+
+    log_func = getattr(logger, level, logger.info)
+
+    log_func(
+        message,
+        command=interaction.command.name if interaction.command else None,
+        user_id=str(interaction.user.id),
+        username=interaction.user.display_name,
+        guild_id=str(interaction.guild.id) if interaction.guild else None,
+        guild_name=interaction.guild.name if interaction.guild else None,
+        channel_id=str(interaction.channel.id) if interaction.channel else None,
+        is_professor=is_professor(interaction),
+        operation=operation,
+        **kwargs
+    )
+    
+async def professor_verification(interaction: Interaction):
+    
+    if not is_professor(interaction):
+        await interaction.response.send_message(
+            "⛔ This command is for professors only.", ephemeral=True
+        )
+                
+        logger.warning(
+            f"❌ Unauthorized user attempted /user_rank: {interaction.user.display_name}",
+            command="user_rank",
+            user_id=str(interaction.user.id),
+            username=interaction.user.display_name,
+            guild_id=str(
+                interaction.guild.id) if interaction.guild else None,
+            operation="permission_denied"
+        )
+        return    

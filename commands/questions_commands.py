@@ -6,7 +6,7 @@ from repositories.topic_repository import get_topic_by_name
 from utils.enum import QuestionType
 from utils.llm_utils import generate_questions_from_pdf
 from utils.structured_logging import structured_logger as logger
-from utils.utils import update_last_interaction, autocomplete_question_type, is_professor, autocomplete_topics, autocomplete_TF
+from utils.utils import professor_verification, update_last_interaction, autocomplete_question_type, is_professor, autocomplete_topics, autocomplete_TF
 
 # Register commands
 
@@ -41,16 +41,7 @@ def register(tree: app_commands.CommandTree):
         try:
             update_last_interaction(interaction.guild.id)
 
-            if not is_professor(interaction):
-                await interaction.followup.send("⛔ This command is for professors only.", ephemeral=True)
-                logger.warning(f"❌ Unauthorized user attempted /add_question: {interaction.user.display_name}",
-                               command="add_question",
-                               user_id=str(interaction.user.id),
-                               username=interaction.user.display_name,
-                               guild_id=str(
-                                   interaction.guild.id) if interaction.guild else None,
-                               operation="permission_denied")
-                return
+            professor_verification(interaction)
 
             if answer.upper() not in ["T", "F"]:
                 await interaction.followup.send("❌ Answer must be 'V' or 'F'", ephemeral=True)
@@ -121,16 +112,7 @@ def register(tree: app_commands.CommandTree):
         try:
             update_last_interaction(interaction.guild.id)
 
-            if not is_professor(interaction):
-                await interaction.followup.send("⛔ This command is for professors only.", ephemeral=True)
-                logger.warning(f"❌ Unauthorized user attempted /list_questions: {interaction.user.display_name}",
-                               command="list_questions",
-                               user_id=str(interaction.user.id),
-                               username=interaction.user.display_name,
-                               guild_id=str(
-                                   interaction.guild.id) if interaction.guild else None,
-                               operation="permission_denied")
-                return
+            professor_verification(interaction)
 
             questions = list_questions_by_topic(interaction.guild.id, topic)
 
@@ -213,16 +195,7 @@ def register(tree: app_commands.CommandTree):
         try:
             update_last_interaction(interaction.guild.id)
 
-            if not is_professor(interaction):
-                await interaction.followup.send("⛔ This command is for professors only.", ephemeral=True)
-                logger.warning(f"❌ Unauthorized user attempted /delete_question: {interaction.user.display_name}",
-                               command="delete_question",
-                               user_id=str(interaction.user.id),
-                               username=interaction.user.display_name,
-                               guild_id=str(
-                                   interaction.guild.id) if interaction.guild else None,
-                               operation="permission_denied")
-                return
+            professor_verification(interaction)
 
             delete_question(interaction.guild.id, topic, id)
             await interaction.followup.send(f"🗑️ Deleted question with ID `{id}` from `{topic}`", ephemeral=True)
@@ -279,16 +252,7 @@ def register(tree: app_commands.CommandTree):
         try:
             update_last_interaction(interaction.guild.id)
 
-            if not is_professor(interaction):
-                await interaction.followup.send("⛔ This command is for professors only.", ephemeral=True)
-                logger.warning(f"❌ Unauthorized user attempted /generate_questions: {interaction.user.display_name}",
-                               command="generate_questions",
-                               user_id=str(interaction.user.id),
-                               username=interaction.user.display_name,
-                               guild_id=str(
-                                   interaction.guild.id) if interaction.guild else None,
-                               operation="permission_denied")
-                return
+            professor_verification(interaction)
 
             guild_id = interaction.guild.id
             topic_data = get_topic_by_name(guild_id, topic)
