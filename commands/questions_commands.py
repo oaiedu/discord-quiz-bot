@@ -24,20 +24,6 @@ def register(tree: app_commands.CommandTree):
         # Immediate defer to avoid Discord timeout (3 seconds)
         await interaction.response.defer(thinking=True, ephemeral=True)
 
-        # Log command execution
-        logger.info(f"🔍 Command /add_question executed by {interaction.user.display_name}",
-                    command="add_question",
-                    user_id=str(interaction.user.id),
-                    username=interaction.user.display_name,
-                    guild_id=str(
-                        interaction.guild.id) if interaction.guild else None,
-                    guild_name=interaction.guild.name if interaction.guild else None,
-                    channel_id=str(
-                        interaction.channel.id) if interaction.channel else None,
-                    is_professor=is_professor(interaction),
-                    topic=topic,
-                    operation="command_execution")
-
         try:
             update_last_interaction(interaction.guild.id)
 
@@ -62,29 +48,7 @@ def register(tree: app_commands.CommandTree):
                 ephemeral=True
             )
 
-            # Log success
-            logger.info(f"✅ Command /add_question successfully completed for {interaction.user.display_name}",
-                        command="add_question",
-                        user_id=str(interaction.user.id),
-                        username=interaction.user.display_name,
-                        guild_id=str(
-                            interaction.guild.id) if interaction.guild else None,
-                        topic=topic,
-                        question_id=new_id,
-                        operation="command_success")
-
         except Exception as e:
-            logger.error(f"❌ Error in /add_question command: {e}",
-                         command="add_question",
-                         user_id=str(interaction.user.id),
-                         username=interaction.user.display_name,
-                         guild_id=str(
-                             interaction.guild.id) if interaction.guild else None,
-                         topic=topic,
-                         error_type=type(e).__name__,
-                         error_message=str(e),
-                         operation="command_error")
-
             try:
                 await interaction.followup.send(f"❌ Failed to add question: {e}", ephemeral=True)
             except Exception:
@@ -95,19 +59,6 @@ def register(tree: app_commands.CommandTree):
     @app_commands.autocomplete(topic=autocomplete_topics)
     async def list_questions_command(interaction: Interaction, topic: str):
         await interaction.response.defer(thinking=True, ephemeral=True)
-
-        logger.info(f"🔍 Command /list_questions executed by {interaction.user.display_name}",
-                    command="list_questions",
-                    user_id=str(interaction.user.id),
-                    username=interaction.user.display_name,
-                    guild_id=str(
-                        interaction.guild.id) if interaction.guild else None,
-                    guild_name=interaction.guild.name if interaction.guild else None,
-                    channel_id=str(
-                        interaction.channel.id) if interaction.channel else None,
-                    is_professor=is_professor(interaction),
-                    topic=topic,
-                    operation="command_execution")
 
         try:
             update_last_interaction(interaction.guild.id)
@@ -145,28 +96,7 @@ def register(tree: app_commands.CommandTree):
             for block in blocks[1:]:
                 await interaction.followup.send(block, ephemeral=True)
 
-            logger.info(f"✅ Command /list_questions successfully completed for {interaction.user.display_name}",
-                        command="list_questions",
-                        user_id=str(interaction.user.id),
-                        username=interaction.user.display_name,
-                        guild_id=str(
-                            interaction.guild.id) if interaction.guild else None,
-                        topic=topic,
-                        questions_count=len(questions),
-                        operation="command_success")
-
         except Exception as e:
-            logger.error(f"❌ Error in /list_questions command: {e}",
-                         command="list_questions",
-                         user_id=str(interaction.user.id),
-                         username=interaction.user.display_name,
-                         guild_id=str(
-                             interaction.guild.id) if interaction.guild else None,
-                         topic=topic,
-                         error_type=type(e).__name__,
-                         error_message=str(e),
-                         operation="command_error",)
-
             try:
                 await interaction.followup.send("❌ Error in /list_questions command.", ephemeral=True)
             except Exception:
@@ -178,20 +108,6 @@ def register(tree: app_commands.CommandTree):
     async def delete_question_command(interaction: Interaction, topic: str, id: str):
         await interaction.response.defer(thinking=True, ephemeral=True)
 
-        logger.info(f"🔍 Command /delete_question executed by {interaction.user.display_name}",
-                    command="delete_question",
-                    user_id=str(interaction.user.id),
-                    username=interaction.user.display_name,
-                    guild_id=str(
-                        interaction.guild.id) if interaction.guild else None,
-                    guild_name=interaction.guild.name if interaction.guild else None,
-                    channel_id=str(
-                        interaction.channel.id) if interaction.channel else None,
-                    is_professor=is_professor(interaction),
-                    topic=topic,
-                    question_id=id,
-                    operation="command_execution")
-
         try:
             update_last_interaction(interaction.guild.id)
 
@@ -200,29 +116,7 @@ def register(tree: app_commands.CommandTree):
             delete_question(interaction.guild.id, topic, id)
             await interaction.followup.send(f"🗑️ Deleted question with ID `{id}` from `{topic}`", ephemeral=True)
 
-            logger.info(f"✅ Command /delete_question successfully completed for {interaction.user.display_name}",
-                        command="delete_question",
-                        user_id=str(interaction.user.id),
-                        username=interaction.user.display_name,
-                        guild_id=str(
-                            interaction.guild.id) if interaction.guild else None,
-                        topic=topic,
-                        question_id=id,
-                        operation="command_success")
-
         except Exception as e:
-            logger.error(f"❌ Error in /delete_question command: {e}",
-                         command="delete_question",
-                         user_id=str(interaction.user.id),
-                         username=interaction.user.display_name,
-                         guild_id=str(
-                             interaction.guild.id) if interaction.guild else None,
-                         topic=topic,
-                         question_id=id,
-                         error_type=type(e).__name__,
-                         error_message=str(e),
-                         operation="command_error")
-
             try:
                 await interaction.followup.send(f"❌ Failed to delete question: {e}", ephemeral=True)
             except Exception:
@@ -233,21 +127,6 @@ def register(tree: app_commands.CommandTree):
     @app_commands.autocomplete(topic=autocomplete_topics, type=autocomplete_question_type)
     async def generate_questions_command(interaction: Interaction, topic: str, qty: int, type: str):
         await interaction.response.defer(thinking=True, ephemeral=True)
-
-        logger.info(f"🔍 Command /generate_questions executed by {interaction.user.display_name}",
-                    command="generate_questions",
-                    user_id=str(interaction.user.id),
-                    username=interaction.user.display_name,
-                    guild_id=str(
-                        interaction.guild.id) if interaction.guild else None,
-                    guild_name=interaction.guild.name if interaction.guild else None,
-                    channel_id=str(
-                        interaction.channel.id) if interaction.channel else None,
-                    is_professor=is_professor(interaction),
-                    topic=topic,
-                    quantity=qty,
-                    question_type=type,
-                    operation="command_execution")
 
         try:
             update_last_interaction(interaction.guild.id)
@@ -275,32 +154,7 @@ def register(tree: app_commands.CommandTree):
                 topic_name, topic_id, guild_id, topic_storage_url, 50, question_type)
             await interaction.followup.send(f"📭 Questions generated from `{topic_name}`", ephemeral=True)
 
-            logger.info(f"✅ Command /generate_questions successfully completed for {interaction.user.display_name}",
-                        command="generate_questions",
-                        user_id=str(interaction.user.id),
-                        username=interaction.user.display_name,
-                        guild_id=str(
-                            interaction.guild.id) if interaction.guild else None,
-                        topic=topic_name,
-                        topic_id=topic_id,
-                        quantity=qty,
-                        question_type=type,
-                        operation="command_success")
-
         except Exception as e:
-            logger.error(f"❌ Error in /generate_questions command: {e}",
-                         command="generate_questions",
-                         user_id=str(interaction.user.id),
-                         username=interaction.user.display_name,
-                         guild_id=str(
-                             interaction.guild.id) if interaction.guild else None,
-                         topic=topic,
-                         quantity=qty,
-                         question_type=type,
-                         error_type=type(e).__name__,
-                         error_message=str(e),
-                         operation="command_error")
-
             try:
                 await interaction.followup.send(f"❌ Failed to generate questions: {e}", ephemeral=True)
             except Exception:

@@ -46,26 +46,8 @@ def register(tree: app_commands.CommandTree):
     ###
     @tree.command(name="topics", description="Displays the available topics for quizzes")
     async def list_topics(interaction: discord.Interaction):
-        logger.info(f"🔍 /topics command executed by {interaction.user.display_name}",
-                    command="topics",
-                    user_id=str(interaction.user.id),
-                    username=interaction.user.display_name,
-                    guild_id=str(interaction.guild.id),
-                    guild_name=interaction.guild.name,
-                    channel_id=str(interaction.channel.id),
-                    is_professor=is_professor(interaction),
-                    operation="command_execution")
-
         try:
-            if not is_professor(interaction):
-                logger.warning("Access denied - non-professor attempted to use /topics command",
-                               command="topics",
-                               user_id=str(interaction.user.id),
-                               username=interaction.user.display_name,
-                               guild_id=str(interaction.guild.id),
-                               operation="access_denied")
-                await interaction.response.send_message("⛔ This command is only available to professors.", ephemeral=True)
-                return
+            professor_verification(interaction)
 
             await interaction.response.defer(thinking=True)
 
@@ -77,31 +59,11 @@ def register(tree: app_commands.CommandTree):
             topic_count = len(topics)
             topics_list = "\n".join(
                 f"- {doc.to_dict().get('title', 'Untitled')}" for doc in topics)
-            logger.info("Topics command completed successfully",
-                        command="topics",
-                        user_id=str(interaction.user.id),
-                        username=interaction.user.display_name,
-                        guild_id=str(interaction.guild.id),
-                        guild_name=interaction.guild.name,
-                        channel_id=str(interaction.channel.id),
-                        is_professor=is_professor(interaction),
-                        operation="command_success",
-                        topic_count=topic_count)
+
 
             await interaction.followup.send(f"📚 Available topics:\n{topics_list}")
 
         except Exception as e:
-            logger.error(f"❌ Error in /topics command: {e}",
-                         command="topics",
-                         user_id=str(interaction.user.id),
-                         username=interaction.user.display_name,
-                         guild_id=str(interaction.guild.id),
-                         guild_name=str(interaction.guild.name),
-                         channel_id=str(interaction.channel.id),
-                         is_professor=is_professor(interaction),
-                         operation="command_error",
-                         error_type=type(e).__name__,
-                         error_message=str(e))
             logging.error(f"Error loading topics: {e}")
 
             try:
@@ -117,20 +79,6 @@ def register(tree: app_commands.CommandTree):
     async def upload_pdf_command(interaction: discord.Interaction, topic_name: str, file: discord.Attachment):
         await interaction.response.defer(thinking=True, ephemeral=True)
 
-        logger.info(f"🔍 /upload_pdf command executed by {interaction.user.display_name}",
-                    command="upload_pdf",
-                    user_id=str(interaction.user.id),
-                    username=interaction.user.display_name,
-                    guild_id=str(
-                        interaction.guild.id) if interaction.guild else None,
-                    guild_name=interaction.guild.name if interaction.guild else None,
-                    channel_id=str(
-                        interaction.channel.id) if interaction.channel else None,
-                    is_professor=is_professor(interaction),
-                    topic=topic_name,
-                    file_name=file.filename if file else None,
-                    operation="command_execution")
-
         try:
             update_last_interaction(interaction.guild.id)
 
@@ -142,17 +90,6 @@ def register(tree: app_commands.CommandTree):
                 guild_id = interaction.guild.id
                 create_topic_without_questions(guild_id, topic_name, pdf_url)
                 await interaction.followup.send("🧠 Topic created successfully, but without questions.", ephemeral=True)
-
-                logger.info(f"✅ /upload_pdf command completed successfully for {interaction.user.display_name}",
-                            command="upload_pdf",
-                            user_id=str(interaction.user.id),
-                            username=interaction.user.display_name,
-                            guild_id=str(
-                                interaction.guild.id) if interaction.guild else None,
-                            topic=topic_name,
-                            file_name=file.filename if file else None,
-                            pdf_url=pdf_url,
-                            operation="command_success")
 
             except Exception as e:
                 await interaction.followup.send(f"❌ Error creating topic: {e}", ephemeral=True)
@@ -168,17 +105,6 @@ def register(tree: app_commands.CommandTree):
                              operation="topic_creation_error")
 
         except Exception as e:
-            logger.error(f"❌ Error in /upload_pdf command: {e}",
-                         command="upload_pdf",
-                         user_id=str(interaction.user.id),
-                         username=interaction.user.display_name,
-                         guild_id=str(
-                             interaction.guild.id) if interaction.guild else None,
-                         topic=topic_name,
-                         error_type=type(e).__name__,
-                         error_message=str(e),
-                         operation="command_error")
-
             try:
                 await interaction.followup.send("❌ Error loading topics.", ephemeral=True)
             except Exception:
@@ -192,20 +118,6 @@ def register(tree: app_commands.CommandTree):
     async def upload_pdf_with_questions(interaction: discord.Interaction, topic_name: str, file: discord.Attachment):
         await interaction.response.defer(thinking=True, ephemeral=True)
 
-        logger.info(f"🔍 /upload_topic command executed by {interaction.user.display_name}",
-                    command="upload_topic",
-                    user_id=str(interaction.user.id),
-                    username=interaction.user.display_name,
-                    guild_id=str(
-                        interaction.guild.id) if interaction.guild else None,
-                    guild_name=interaction.guild.name if interaction.guild else None,
-                    channel_id=str(
-                        interaction.channel.id) if interaction.channel else None,
-                    is_professor=is_professor(interaction),
-                    topic=topic_name,
-                    file_name=file.filename if file else None,
-                    operation="command_execution")
-
         try:
             update_last_interaction(interaction.guild.id)
 
@@ -218,30 +130,7 @@ def register(tree: app_commands.CommandTree):
                 topic_name, None, guild_id, pdf_url, 50, QuestionType.TRUE_FALSE)
             await interaction.followup.send("🧠 Questions successfully generated from the PDF.", ephemeral=True)
 
-            logger.info(f"✅ /upload_topic command completed successfully for {interaction.user.display_name}",
-                        command="upload_topic",
-                        user_id=str(interaction.user.id),
-                        username=interaction.user.display_name,
-                        guild_id=str(
-                            interaction.guild.id) if interaction.guild else None,
-                        topic=topic_name,
-                        file_name=file.filename if file else None,
-                        pdf_url=pdf_url,
-                        questions_generated=50,
-                        operation="command_success")
-
         except Exception as e:
-            logger.error(f"❌ Error in /upload_topic command: {e}",
-                         command="upload_topic",
-                         user_id=str(interaction.user.id),
-                         username=interaction.user.display_name,
-                         guild_id=str(
-                             interaction.guild.id) if interaction.guild else None,
-                         topic=topic_name,
-                         error_type=type(e).__name__,
-                         error_message=str(e),
-                         operation="command_error")
-
             try:
                 await interaction.followup.send(f"❌ Error generating questions: {e}", ephemeral=True)
             except Exception:

@@ -15,15 +15,6 @@ def register(tree: app_commands.CommandTree):
 
     @tree.command(name="stats", description="Shows a summary of the quizzes taken by all users (professors only)")
     async def stats(interaction: discord.Interaction):
-        logger.info(f"🔍 /stats command executed by {interaction.user.display_name}",
-                    command="stats",
-                    user_id=str(interaction.user.id),
-                    username=interaction.user.display_name,
-                    guild_id=str(interaction.guild.id),
-                    guild_name=interaction.guild.name,
-                    channel_id=str(interaction.channel.id),
-                    is_professor=is_professor(interaction),
-                    operation="command_execution")
 
         try:
             update_server_last_interaction(interaction.guild.id)
@@ -53,32 +44,9 @@ def register(tree: app_commands.CommandTree):
                 for attempt in info['attempts'][-3:]:
                     summary += f"\n  • {attempt.get('topic_id', 'Unknown')}: {attempt.get('success', 0)}/{attempt.get('success', 0) + attempt.get('failures', 0)}"
 
-            logger.info("Stats command completed successfully",
-                        command="stats",
-                        user_id=str(interaction.user.id),
-                        username=interaction.user.name,
-                        guild_id=str(interaction.guild.id),
-                        guild_name=interaction.guild.name,
-                        channel_id=str(interaction.channel.id),
-                        is_professor=is_professor(interaction),
-                        operation="command_success",
-                        user_count=user_count,
-                        total_attempts=total_attempts)
-
             await interaction.followup.send(summary, ephemeral=True)
 
         except Exception as e:
-            logger.error("Error in stats command",
-                        command="stats",
-                        user_id=str(interaction.user.id),
-                        username=interaction.user.name,
-                        guild_id=str(interaction.guild.id),
-                        guild_name=interaction.guild.name,
-                        channel_id=str(interaction.channel.id),
-                        is_professor=is_professor(interaction),
-                        operation="command_error",
-                        error_type=type(e).__name__,
-                        error_message=str(e))
             logging.error(f"Error retrieving statistics: {e}")
 
             try:
@@ -88,16 +56,6 @@ def register(tree: app_commands.CommandTree):
             
     @tree.command(name="user_stats", description="Shows a summary of quiz attempts per user (professors only)")
     async def user_stats(interaction: discord.Interaction):
-        logger.info("Command execution started",
-                    command="user_stats",
-                    user_id=str(interaction.user.id),
-                    username=interaction.user.name,
-                    guild_id=str(interaction.guild.id),
-                    guild_name=interaction.guild.name,
-                    channel_id=str(interaction.channel.id),
-                    is_professor=is_professor(interaction),
-                    operation="command_execution")
-
         try:
             update_server_last_interaction(interaction.guild.id)
 
@@ -176,18 +134,6 @@ def register(tree: app_commands.CommandTree):
             buf.seek(0)
             plt.close(fig)
 
-            logger.info("User stats command completed successfully",
-                        command="user_stats",
-                        user_id=str(interaction.user.id),
-                        username=interaction.user.name,
-                        guild_id=str(interaction.guild.id),
-                        guild_name=interaction.guild.name,
-                        channel_id=str(interaction.channel.id),
-                        is_professor=is_professor(interaction),
-                        operation="command_success",
-                        user_count=user_count,
-                        total_attempts=total_attempts)
-
             await interaction.followup.send(
                 content="📊 Quiz attempts per user (each bar segment = one attempt):",
                 file=File(fp=buf, filename="user_stats_stacked.png"),
@@ -195,17 +141,6 @@ def register(tree: app_commands.CommandTree):
             )
 
         except Exception as e:
-            logger.error("Error in user_stats command",
-                         command="user_stats",
-                         user_id=str(interaction.user.id),
-                         username=interaction.user.name,
-                         guild_id=str(interaction.guild.id),
-                         guild_name=interaction.guild.name,
-                         channel_id=str(interaction.channel.id),
-                         is_professor=is_professor(interaction),
-                         operation="command_error",
-                         error_type=type(e).__name__,
-                         error_message=str(e))
             logging.error(f"Error generating user_stats graph: {e}")
 
             try:
@@ -215,16 +150,6 @@ def register(tree: app_commands.CommandTree):
 
     @tree.command(name="time_stats", description="Shows a summary of the quizzes taken over time (professors only)")
     async def time_stats(interaction: discord.Interaction):
-        logger.info("Command execution started",
-                    command="time_stats",
-                    user_id=str(interaction.user.id),
-                    username=interaction.user.name,
-                    guild_id=str(interaction.guild.id),
-                    guild_name=interaction.guild.name,
-                    channel_id=str(interaction.channel.id),
-                    is_professor=is_professor(interaction),
-                    operation="command_execution")
-
         try:
             update_server_last_interaction(interaction.guild.id)
 
@@ -268,18 +193,6 @@ def register(tree: app_commands.CommandTree):
             total_periods = len(dates)
             total_quizzes = sum(values)
 
-            logger.info("Time stats command completed successfully",
-                        command="time_stats",
-                        user_id=str(interaction.user.id),
-                        username=interaction.user.name,
-                        guild_id=str(interaction.guild.id),
-                        guild_name=interaction.guild.name,
-                        channel_id=str(interaction.channel.id),
-                        is_professor=is_professor(interaction),
-                        operation="command_success",
-                        total_periods=total_periods,
-                        total_quizzes=total_quizzes)
-
             await interaction.followup.send(
                 "📈 Statistics over time:",
                 file=discord.File(fp=buf, filename="time_stats.png"),
@@ -287,17 +200,6 @@ def register(tree: app_commands.CommandTree):
             )
 
         except Exception as e:
-            logger.error("Error in time_stats command",
-                        command="time_stats",
-                        user_id=str(interaction.user.id),
-                        username=interaction.user.name,
-                        guild_id=str(interaction.guild.id),
-                        guild_name=interaction.guild.name,
-                        channel_id=str(interaction.channel.id),
-                        is_professor=is_professor(interaction),
-                        operation="command_error",
-                        error_type=type(e).__name__,
-                        error_message=str(e))
             logging.error(f"Error retrieving time statistics: {e}")
 
             try:
