@@ -13,7 +13,7 @@
 #         self.current_page = 1
 #         self.sep = 5
 #         self.data = data
-#         self.message = None  # será preenchido após o envio
+#         self.message = None  # will be filled after sending
 
 #     async def send(self, ctx):
 #         self.message = await ctx.send(view=self)
@@ -21,16 +21,16 @@
 
 #     def create_embed(self, data):
 #         total_pages = max(1, (len(self.data) + self.sep - 1) // self.sep)
-#         embed = discord.Embed(title=f"Lista de Perguntas – Página {self.current_page} de {total_pages}")
+#         embed = discord.Embed(title=f"Questions List – Page {self.current_page} of {total_pages}")
 
 #         for item in data:
-#             pergunta = item.get("pregunta", "❓ Sem pergunta")
-#             resposta = item.get("respuesta", "❓")
+#             question = item.get("pregunta", "❓ No question")
+#             answer = item.get("respuesta", "❓")
 #             id_ = item.get("id", "N/A")
 
 #             embed.add_field(
-#                 name=f"❓ {pergunta}",
-#                 value=f"**Resposta:** {resposta} \n`ID: {id_}`",
+#                 name=f"❓ {question}",
+#                 value=f"**Answer:** {answer} \n`ID: {id_}`",
 #                 inline=False
 #             )
 
@@ -49,7 +49,7 @@
 #     def update_buttons(self):
 #         total_pages = math.ceil(len(self.data) / self.sep)
 
-#         # Desabilita anterior se na primeira página
+#         # Disable previous if on first page
 #         if self.current_page == 1:
 #             self.children[0].disabled = True  # first_page_button
 #             self.children[1].disabled = True  # prev_button
@@ -57,7 +57,7 @@
 #             self.children[0].disabled = False
 #             self.children[1].disabled = False
 
-#         # Desabilita próximo se na última página
+#         # Disable next if on last page
 #         if self.current_page >= total_pages:
 #             self.children[2].disabled = True  # next_button
 #             self.children[3].disabled = True  # last_page_button

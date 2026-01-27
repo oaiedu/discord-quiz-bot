@@ -1,111 +1,111 @@
-# Logging Estructurado para Google Cloud Run
+# Structured Logging for Google Cloud Run
 
-Este proyecto utiliza logging estructurado para generar logs en formato JSON que Google Cloud Run puede procesar correctamente, mostrando diferentes niveles de gravedad.
+This project uses structured logging to generate logs in JSON format that Google Cloud Run can process correctly, displaying different severity levels.
 
-## Tipos de Logs Disponibles
+## Available Log Types
 
-### 1. INFO (Información general)
+### 1. INFO (General information)
 ```python
 from utils.structured_logging import structured_logger as logger
 
-logger.info("Usuario ejecutó comando quiz", 
+logger.info("User executed quiz command", 
            user_id="12345", 
            guild_id="67890", 
            command="quiz",
            topic="mathematics")
 ```
 
-### 2. WARNING (Advertencias)
+### 2. WARNING (Warnings)
 ```python
-logger.warning("Usuario intentó usar comando sin permisos", 
+logger.warning("User attempted to use command without permissions", 
               user_id="12345", 
               guild_id="67890", 
               command="admin_command",
               missing_role="faculty")
 ```
 
-### 3. ERROR (Errores)
+### 3. ERROR (Errors)
 ```python
-logger.error("Error al conectar con la base de datos", 
+logger.error("Error connecting to the database", 
             operation="database_connection",
             error_type="ConnectionError",
             retry_count=3)
 ```
 
-### 4. DEBUG (Información de depuración)
+### 4. DEBUG (Debug information)
 ```python
-logger.debug("Estado interno del quiz", 
+logger.debug("Quiz internal state", 
             user_id="12345",
             current_question=3,
             total_questions=5,
             score=2)
 ```
 
-### 5. CRITICAL (Errores críticos)
+### 5. CRITICAL (Critical errors)
 ```python
-logger.critical("Bot perdió conexión con Discord", 
+logger.critical("Bot lost connection with Discord", 
                error_type="ConnectionLost",
                uptime_seconds=3600,
                last_heartbeat="2024-01-01T12:00:00Z")
 ```
 
-## Campos Estructurados Recomendados
+## Recommended Structured Fields
 
-### Para operaciones de usuario:
-- `user_id`: ID del usuario de Discord
-- `guild_id`: ID del servidor de Discord
-- `command`: Comando ejecutado
-- `username`: Nombre del usuario
+### For user operations:
+- `user_id`: Discord user ID
+- `guild_id`: Discord server ID
+- `command`: Executed command
+- `username`: Username
 
-### Para operaciones de base de datos:
-- `operation`: Tipo de operación (create, read, update, delete)
-- `collection`: Colección de Firestore
-- `document_id`: ID del documento
-- `error_type`: Tipo de excepción si hay error
+### For database operations:
+- `operation`: Type of operation (create, read, update, delete)
+- `collection`: Firestore collection
+- `document_id`: Document ID
+- `error_type`: Exception type if there is an error
 
-### Para operaciones del sistema:
-- `component`: Componente del sistema
-- `resource_usage`: Uso de recursos
-- `response_time_ms`: Tiempo de respuesta
-- `status_code`: Código de estado
+### For system operations:
+- `component`: System component
+- `resource_usage`: Resource usage
+- `response_time_ms`: Response time
+- `status_code`: Status code
 
-## Visualización en Google Cloud Console
+## Viewing in Google Cloud Console
 
-Los logs aparecerán en Cloud Console con:
+Logs will appear in Cloud Console with:
 - **Severity**: INFO, WARNING, ERROR, DEBUG, CRITICAL
-- **Timestamp**: Marca de tiempo UTC
+- **Timestamp**: UTC timestamp
 - **Component**: discord-quiz-bot
-- **Campos personalizados**: Todos los kwargs adicionales
+- **Custom fields**: All additional kwargs
 
-### Filtros útiles en Cloud Console:
+### Useful filters in Cloud Console:
 
 ```
-# Solo errores
+# Only errors
 severity >= ERROR
 
-# Logs de un usuario específico
+# Logs from a specific user
 jsonPayload.user_id = "123456789"
 
-# Logs de comandos específicos
+# Logs from specific commands
 jsonPayload.command = "quiz"
 
-# Errores de base de datos
+# Database errors
 jsonPayload.operation != "" AND severity >= ERROR
 ```
 
-## Mejores Prácticas
+## Best Practices
 
-1. **Consistencia**: Usa siempre los mismos nombres de campos
-2. **Contexto**: Incluye información suficiente para debug
-3. **No PII**: Evita información personal identificable
-4. **Estructura**: Usa kwargs para datos estructurados
-5. **Severity apropiada**: Usa el nivel correcto de gravedad
+1. **Consistency**: Always use the same field names
+2. **Context**: Include enough information for debugging
+3. **No PII**: Avoid personally identifiable information
+4. **Structure**: Use kwargs for structured data
+5. **Appropriate Severity**: Use the correct severity level
 
-### Ejemplo de log completo:
+### Example of complete log:
 ```json
 {
   "severity": "ERROR",
-  "message": "❌ Error al ejecutar quiz: Database timeout",
+  "message": "❌ Error executing quiz: Database timeout",
   "timestamp": "2024-01-01T12:00:00+00:00",
   "component": "discord-quiz-bot",
   "user_id": "123456789",

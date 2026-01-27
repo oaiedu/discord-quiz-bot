@@ -144,7 +144,7 @@ def get_leaderboard(guild_id: str, limit: int = 10):
 
 def calculate_level(xp: int) -> int:
     return xp // 100 + 1
-    # OU curva exponencial:
+    # OR exponential curve:
     # level = int((xp / 50) ** 0.5) + 1
 
 
