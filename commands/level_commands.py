@@ -23,7 +23,14 @@ def register(tree: app_commands.CommandTree):
             update_last_interaction(interaction.guild.id)
 
             leaderboard = get_leaderboard(str(interaction.guild.id), limit=5)
-
+            leaderboard = get_leaderboard(str(interaction.guild.id), limit=5)
+            if not leaderboard or len(leaderboard) == 0:
+                await interaction.response.send_message(
+                "📊 No leaderboard data available yet!\n"
+                "Complete some quizzes to appear on the leaderboard.",
+                ephemeral=True
+            )
+                return
             msg = "🏆 **Leaderboard**\n"
             for idx, (user_id, xp, level) in enumerate(leaderboard, start=1):
                 user = await interaction.guild.fetch_member(user_id)
