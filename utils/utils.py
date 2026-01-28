@@ -81,14 +81,14 @@ def register_user_statistics(
     
 def log_command_event(level: str, interaction, message: str, operation: str, **kwargs):
     """
-    Centraliza o logging estruturado para comandos de slash.
+    Centralizes structured logging for slash commands.
 
     Args:
-        level (str): Nível do log ("info", "error", "warning", "debug", "critical").
-        interaction (discord.Interaction): O objeto da interação do Discord.
-        message (str): Mensagem principal do log.
-        operation (str): Tipo de operação (ex.: "command_execution", "command_success", "command_error").
-        **kwargs: Campos extras opcionais (ex.: error_type, error_message).
+        level (str): Log level ("info", "error", "warning", "debug", "critical").
+        interaction (discord.Interaction): The Discord interaction object.
+        message (str): Main log message.
+        operation (str): Type of operation (e.g., "command_execution", "command_success", "command_error").
+        **kwargs: Optional extra fields (e.g., error_type, error_message).
     """
 
     log_func = getattr(logger, level, logger.info)

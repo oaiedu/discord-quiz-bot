@@ -1,123 +1,123 @@
 #!/bin/bash
 
-# Script para hacer deploy del Discord Quiz Bot a Google Cloud Run
+# Script for deploying the Discord Quiz Bot to Google Cloud Run
 set -e
 
-# Función para limpiar archivos temporales
+# Function to clean up temporary files
 cleanup() {
-    echo -e "${YELLOW}🧹 Limpiando archivos temporales...${NC}"
+    echo -e "${YELLOW}🧹 Cleaning up temporary files...${NC}"
     rm -f firebase_config.json
 }
 
-# Configurar trap para limpiar en caso de error
+# Set up trap to clean up on error
 trap cleanup EXIT
 
-# Colores para output
+# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}🚀 Iniciando deploy del Discord Quiz Bot a Cloud Run...${NC}"
+echo -e "${BLUE}🚀 Starting deployment of Discord Quiz Bot to Cloud Run...${NC}"
 
-# Variables de configuración (modifica según tus necesidades)
-PROJECT_ID=${GOOGLE_CLOUD_PROJECT:-"tu-proyecto-id"}
+# Configuration variables (modify as needed)
+PROJECT_ID=${GOOGLE_CLOUD_PROJECT:-"your-project-id"}
 SERVICE_NAME="discord-quiz-bot"
 REGION="us-central1"
 IMAGE_NAME="${REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}"
 
-# Verificar que el usuario esté autenticado
-echo -e "${YELLOW}📋 Verificando autenticación...${NC}"
+# Verify user is authenticated
+echo -e "${YELLOW}📋 Verifying authentication...${NC}"
 if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" | grep -q .; then
-    echo -e "${RED}❌ No estás autenticado. Ejecuta: gcloud auth login${NC}"
+    echo -e "${RED}❌ Not authenticated. Run: gcloud auth login${NC}"
     exit 1
 fi
 
-# Verificar que el proyecto esté configurado
-if [ "$PROJECT_ID" = "tu-proyecto-id" ]; then
-    echo -e "${RED}❌ Por favor, configura tu PROJECT_ID en el script o usa la variable de entorno GOOGLE_CLOUD_PROJECT${NC}"
+# Verify that project is configured
+if [ "$PROJECT_ID" = "your-project-id" ]; then
+    echo -e "${RED}❌ Please configure your PROJECT_ID in the script or use the GOOGLE_CLOUD_PROJECT environment variable${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✅ Autenticado como: $(gcloud auth list --filter=status:ACTIVE --format="value(account)")${NC}"
-echo -e "${GREEN}✅ Proyecto: ${PROJECT_ID}${NC}"
+echo -e "${GREEN}✅ Authenticated as: $(gcloud auth list --filter=status:ACTIVE --format="value(account)")${NC}"
+echo -e "${GREEN}✅ Project: ${PROJECT_ID}${NC}"
 
-# Habilitar APIs necesarias
-echo -e "${YELLOW}🔧 Habilitando APIs necesarias...${NC}"
+# Enable necessary APIs
+echo -e "${YELLOW}🔧 Enabling necessary APIs...${NC}"
 gcloud services enable cloudbuild.googleapis.com --project=${PROJECT_ID}
 gcloud services enable run.googleapis.com --project=${PROJECT_ID}
 gcloud services enable artifactregistry.googleapis.com --project=${PROJECT_ID}
 gcloud services enable secretmanager.googleapis.com --project=${PROJECT_ID}
 
-# Crear repositorio de Artifact Registry si no existe
-echo -e "${YELLOW}📦 Configurando Artifact Registry...${NC}"
+# Create Artifact Registry repository if it doesn't exist
+echo -e "${YELLOW}📦 Configuring Artifact Registry...${NC}"
 if ! gcloud artifacts repositories describe ${SERVICE_NAME} --location=${REGION} --project=${PROJECT_ID} >/dev/null 2>&1; then
     gcloud artifacts repositories create ${SERVICE_NAME} \
         --repository-format=docker \
         --location=${REGION} \
         --project=${PROJECT_ID}
-    echo -e "${GREEN}✅ Repositorio de Artifact Registry creado${NC}"
+    echo -e "${GREEN}✅ Artifact Registry repository created${NC}"
 else
-    echo -e "${GREEN}✅ Repositorio de Artifact Registry ya existe${NC}"
+    echo -e "${GREEN}✅ Artifact Registry repository already exists${NC}"
 fi
 
-# Construir la imagen Docker
-echo -e "${YELLOW}🏗️  Construyendo imagen Docker...${NC}"
+# Build the Docker image
+echo -e "${YELLOW}🏗️  Building Docker image...${NC}"
 gcloud builds submit --tag ${IMAGE_NAME} --project=${PROJECT_ID} --gcs-source-staging-dir=gs://oaiedu_cloudbuild/source .
 
 if [ $? -ne 0 ]; then
-    echo -e "${RED}❌ Error al construir la imagen Docker${NC}"
+    echo -e "${RED}❌ Error building the Docker image${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✅ Imagen construida exitosamente: ${IMAGE_NAME}${NC}"
+echo -e "${GREEN}✅ Image built successfully: ${IMAGE_NAME}${NC}"
 
-# Verificar variables de entorno necesarias
-echo -e "${YELLOW}📝 Verificando variables de entorno...${NC}"
+# Verify required environment variables
+echo -e "${YELLOW}📝 Verifying environment variables...${NC}"
 
-# Variables requeridas
+# Required variables
 if [ -z "$DISCORD_TOKEN" ]; then
-    echo -e "${RED}❌ DISCORD_TOKEN no está configurado. Por favor, configura esta variable de entorno.${NC}"
+    echo -e "${RED}❌ DISCORD_TOKEN is not configured. Please set this environment variable.${NC}"
     exit 1
 fi
 
 if [ -z "$OPENROUTER_API_KEY" ]; then
-    echo -e "${RED}❌ OPENROUTER_API_KEY no está configurado. Por favor, configura esta variable de entorno.${NC}"
+    echo -e "${RED}❌ OPENROUTER_API_KEY is not configured. Please set this environment variable.${NC}"
     exit 1
 fi
 
 if [ -z "$GCS_BUCKET_NAME" ]; then
-    echo -e "${RED}❌ GCS_BUCKET_NAME no está configurado. Por favor, configura esta variable de entorno.${NC}"
+    echo -e "${RED}❌ GCS_BUCKET_NAME is not configured. Please set this environment variable.${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✅ Variables de entorno verificadas${NC}"
+echo -e "${GREEN}✅ Environment variables verified${NC}"
 
-# Descargar firebase_config.json desde Secret Manager
-echo -e "${YELLOW}🔐 Descargando firebase_config.json desde Secret Manager...${NC}"
+# Download firebase_config.json from Secret Manager
+echo -e "${YELLOW}🔐 Downloading firebase_config.json from Secret Manager...${NC}"
 SECRET_NAME="firebase-config"
 
-# Verificar si el secreto existe
+# Verify if the secret exists
 if ! gcloud secrets describe ${SECRET_NAME} --project=${PROJECT_ID} >/dev/null 2>&1; then
-    echo -e "${RED}❌ Secret '${SECRET_NAME}' no encontrado en Secret Manager.${NC}"
-    echo -e "${YELLOW}💡 Sube firebase_config.json a Secret Manager con:${NC}"
+    echo -e "${RED}❌ Secret '${SECRET_NAME}' not found in Secret Manager.${NC}"
+    echo -e "${YELLOW}💡 Upload firebase_config.json to Secret Manager with:${NC}"
     echo "gcloud secrets create ${SECRET_NAME} --data-file=firebase_config.json --project=${PROJECT_ID}"
     exit 1
 fi
 
-# Descargar el secreto
+# Download the secret
 gcloud secrets versions access latest --secret=${SECRET_NAME} --project=${PROJECT_ID} > firebase_config.json
 
 if [ $? -ne 0 ]; then
-    echo -e "${RED}❌ Error al descargar firebase_config.json desde Secret Manager${NC}"
+    echo -e "${RED}❌ Error downloading firebase_config.json from Secret Manager${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✅ firebase_config.json descargado desde Secret Manager${NC}"
+echo -e "${GREEN}✅ firebase_config.json downloaded from Secret Manager${NC}"
 
-# Hacer deploy a Cloud Run
-echo -e "${YELLOW}🚀 Haciendo deploy a Cloud Run...${NC}"
+# Deploy to Cloud Run
+echo -e "${YELLOW}🚀 Deploying to Cloud Run...${NC}"
 gcloud run deploy ${SERVICE_NAME} \
     --image ${IMAGE_NAME} \
     --platform managed \
@@ -136,19 +136,19 @@ gcloud run deploy ${SERVICE_NAME} \
     --timeout 3600
 
 if [ $? -eq 0 ]; then
-    echo -e "${GREEN}🎉 Deploy completado exitosamente!${NC}"
+    echo -e "${GREEN}🎉 Deployment completed successfully!${NC}"
     
-    # Obtener la URL del servicio
+    # Get the service URL
     SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --platform managed --region ${REGION} --project ${PROJECT_ID} --format 'value(status.url)')
-    echo -e "${GREEN}🌐 URL del servicio: ${SERVICE_URL}${NC}"
+    echo -e "${GREEN}🌐 Service URL: ${SERVICE_URL}${NC}"
     
-    # Mostrar logs
-    echo -e "${BLUE}📋 Para ver los logs en tiempo real, ejecuta:${NC}"
+    # Display logs
+    echo -e "${BLUE}📋 To view logs in real-time, run:${NC}"
     echo "gcloud logging tail \"resource.type=cloud_run_revision AND resource.labels.service_name=${SERVICE_NAME}\" --project=${PROJECT_ID}"
     
 else
-    echo -e "${RED}❌ Error en el deploy${NC}"
+    echo -e "${RED}❌ Error in deployment${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✅ Script de deploy completado${NC}"
+echo -e "${GREEN}✅ Deployment script completed${NC}"

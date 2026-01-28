@@ -1,146 +1,146 @@
-# Deployment Guide para Discord Quiz Bot en Google Cloud Run
+# Deployment Guide for Discord Quiz Bot on Google Cloud Run
 
-## Prerrequisitos
+## Prerequisites
 
-1. **Google Cloud CLI instalado**: 
+1. **Google Cloud CLI installed**: 
    ```bash
    # macOS
    brew install google-cloud-sdk
    
-   # O descarga desde: https://cloud.google.com/sdk/docs/install
+   # Or download from: https://cloud.google.com/sdk/docs/install
    ```
 
-2. **Autenticación en Google Cloud**:
+2. **Google Cloud Authentication**:
    ```bash
    gcloud auth login
-   gcloud config set project TU-PROJECT-ID
+   gcloud config set project YOUR-PROJECT-ID
    ```
 
-3. **Docker instalado** (opcional, Cloud Build lo maneja):
+3. **Docker installed** (optional, Cloud Build handles it):
    ```bash
    # macOS
    brew install docker
    ```
 
-## Configuración
+## Configuration
 
-1. **Copiar archivo de variables de entorno**:
+1. **Copy environment variables file**:
    ```bash
    cp .env.deploy.example .env.deploy
    ```
 
-2. **Editar `.env.deploy`** con tus valores reales:
-   - `GOOGLE_CLOUD_PROJECT`: Tu ID de proyecto de Google Cloud
-   - `DISCORD_TOKEN`: Token de tu bot de Discord
-   - `OPENROUTER_API_KEY`: API key de OpenRouter.ai para generar preguntas
-   - `GCS_BUCKET_NAME`: Nombre del bucket de Google Cloud Storage
+2. **Edit `.env.deploy`** with your actual values:
+   - `GOOGLE_CLOUD_PROJECT`: Your Google Cloud project ID
+   - `DISCORD_TOKEN`: Your Discord bot token
+   - `OPENROUTER_API_KEY`: API key from OpenRouter.ai for question generation
+   - `GCS_BUCKET_NAME`: Google Cloud Storage bucket name
 
-3. **Configurar Firebase en Secret Manager**:
-   - Descarga firebase_config.json desde Firebase Console > Project Settings > Service Accounts > Generate new private key
-   - Súbelo a Secret Manager:
+3. **Configure Firebase in Secret Manager**:
+   - Download firebase_config.json from Firebase Console > Project Settings > Service Accounts > Generate new private key
+   - Upload it to Secret Manager:
      ```bash
-     gcloud secrets create firebase-config --data-file=firebase_config.json --project=TU-PROJECT-ID
+     gcloud secrets create firebase-config --data-file=firebase_config.json --project=YOUR-PROJECT-ID
      ```
-   - El script descargará automáticamente este archivo durante el deploy
+   - The script will automatically download this file during deployment
 
-4. **Cargar variables de entorno**:
+4. **Load environment variables**:
    ```bash
    source .env.deploy
    ```
 
 ## Deploy
 
-1. **Hacer el script ejecutable**:
+1. **Make the script executable**:
    ```bash
    chmod +x deploy.sh
    ```
 
-2. **Ejecutar el deploy**:
+2. **Run the deployment**:
    ```bash
    ./deploy.sh
    ```
 
-## Comandos útiles post-deploy
+## Useful commands after deployment
 
-### Gestión de Secret Manager:
+### Secret Manager management:
 ```bash
-# Ver todos los secretos
-gcloud secrets list --project=TU-PROJECT-ID
+# List all secrets
+gcloud secrets list --project=YOUR-PROJECT-ID
 
-# Ver versiones del secreto firebase-config
-gcloud secrets versions list firebase-config --project=TU-PROJECT-ID
+# List versions of firebase-config secret
+gcloud secrets versions list firebase-config --project=YOUR-PROJECT-ID
 
-# Actualizar firebase-config
-gcloud secrets versions add firebase-config --data-file=nuevo_firebase_config.json --project=TU-PROJECT-ID
+# Update firebase-config
+gcloud secrets versions add firebase-config --data-file=new_firebase_config.json --project=YOUR-PROJECT-ID
 
-# Eliminar un secreto
-gcloud secrets delete firebase-config --project=TU-PROJECT-ID
+# Delete a secret
+gcloud secrets delete firebase-config --project=YOUR-PROJECT-ID
 ```
 
-### Ver logs en tiempo real:
+### View logs in real-time:
 ```bash
-gcloud logging tail "resource.type=cloud_run_revision AND resource.labels.service_name=discord-quiz-bot" --project=TU-PROJECT-ID
+gcloud logging tail "resource.type=cloud_run_revision AND resource.labels.service_name=discord-quiz-bot" --project=YOUR-PROJECT-ID
 ```
 
-### Ver servicios de Cloud Run:
+### View Cloud Run services:
 ```bash
-gcloud run services list --project=TU-PROJECT-ID
+gcloud run services list --project=YOUR-PROJECT-ID
 ```
 
-### Actualizar variables de entorno:
+### Update environment variables:
 ```bash
 gcloud run services update discord-quiz-bot \
-  --set-env-vars NUEVA_VAR=valor \
+  --set-env-vars NEW_VAR=value \
   --region=us-central1 \
-  --project=TU-PROJECT-ID
+  --project=YOUR-PROJECT-ID
 ```
 
-### Escalar el servicio:
+### Scale the service:
 ```bash
 gcloud run services update discord-quiz-bot \
   --min-instances=0 \
   --max-instances=5 \
   --region=us-central1 \
-  --project=TU-PROJECT-ID
+  --project=YOUR-PROJECT-ID
 ```
 
-### Eliminar el servicio:
+### Delete the service:
 ```bash
 gcloud run services delete discord-quiz-bot \
   --region=us-central1 \
-  --project=TU-PROJECT-ID
+  --project=YOUR-PROJECT-ID
 ```
 
 ## Troubleshooting
 
-### Error de autenticación:
+### Authentication error:
 ```bash
 gcloud auth login
 gcloud auth application-default login
 ```
 
-### Error de permisos:
-Asegúrate de tener los roles necesarios:
+### Permission error:
+Make sure you have the required roles:
 - Cloud Run Admin
 - Cloud Build Editor
-- Storage Admin (para Container Registry)
+- Storage Admin (for Container Registry)
 
-### Bot no responde:
-1. Verifica los logs
-2. Confirma que el token de Discord sea correcto
-3. Verifica que el bot tenga los permisos necesarios en Discord
+### Bot not responding:
+1. Check the logs
+2. Confirm the Discord token is correct
+3. Verify the bot has the necessary permissions in Discord
 
-### Timeout en el deploy:
-Si el bot tarda mucho en iniciar, aumenta el timeout:
+### Deployment timeout:
+If the bot takes too long to start, increase the timeout:
 ```bash
 --timeout 3600
 ```
 
-## Costos estimados
+## Estimated costs
 
-Cloud Run es pay-per-use:
-- **CPU**: ~$0.00002400 por vCPU-segundo
-- **Memoria**: ~$0.00000250 por GiB-segundo  
-- **Requests**: Primeros 2M gratis, luego $0.40 por millón
+Cloud Run is pay-per-use:
+- **CPU**: ~$0.00002400 per vCPU-second
+- **Memory**: ~$0.00000250 per GiB-second  
+- **Requests**: First 2M free, then $0.40 per million
 
-Para un bot pequeño/mediano: ~$5-15/mes
+For a small/medium bot: ~$5-15/month
