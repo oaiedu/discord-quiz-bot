@@ -28,7 +28,8 @@ async def save_pdf(interaction: Interaction, file: discord.Attachment, topic_nam
         print(pdf_url)
 
         if not pdf_url:
-            await interaction.followup.send("❌ No topics available yet.", ephemeral=True)
+            await interaction.followup.send("❌ Storage Error: Failed to upload PDF.", ephemeral=True)
+            return None # To ensure the calling function knows it failed
 
         if os.path.exists(pdf_path):
             os.remove(pdf_path)
@@ -37,6 +38,7 @@ async def save_pdf(interaction: Interaction, file: discord.Attachment, topic_nam
 
     except Exception as e:
         logging.error(f"Error saving PDF: {e}")
+        return None
 
 
 def register(tree: app_commands.CommandTree):
@@ -51,7 +53,12 @@ def register(tree: app_commands.CommandTree):
 
             await interaction.response.defer(thinking=True)
 
-            update_last_interaction(interaction.guild.id)
+            # --- Protection for Issue #1494 ---
+            try:
+                update_last_interaction(interaction.guild.id)
+            except Exception as e:
+                logging.warning(f"Failed to update interaction: {e}")
+
             topics = get_topics_by_server(interaction.guild.id)
 
             professor_verification(interaction)
@@ -80,11 +87,18 @@ def register(tree: app_commands.CommandTree):
         await interaction.response.defer(thinking=True, ephemeral=True)
 
         try:
-            update_last_interaction(interaction.guild.id)
+            # --- Protection for Issue #1494 ---
+            try:
+                update_last_interaction(interaction.guild.id)
+            except Exception as e:
+                logging.warning(f"Failed to update interaction: {e}")
 
             professor_verification(interaction)
 
             pdf_url = await save_pdf(interaction, file, topic_name)
+
+            if pdf_url is None:
+                return # Stop execution here if upload failed
 
             try:
                 guild_id = interaction.guild.id
@@ -119,11 +133,18 @@ def register(tree: app_commands.CommandTree):
         await interaction.response.defer(thinking=True, ephemeral=True)
 
         try:
-            update_last_interaction(interaction.guild.id)
+            # --- Protection for Issue #1494 ---
+            try:
+                update_last_interaction(interaction.guild.id)
+            except Exception as e:
+                logging.warning(f"Failed to update interaction: {e}")
 
             professor_verification(interaction)
 
             pdf_url = await save_pdf(interaction, file, topic_name)
+
+            if pdf_url is None:
+                return # Stop execution here if upload failed
 
             guild_id = interaction.guild.id
             generate_questions_from_pdf(
