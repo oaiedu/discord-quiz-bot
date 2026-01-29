@@ -5,4 +5,5 @@ questions.json
 
 firebase_config.json
 __pycache__/
+venv/
 

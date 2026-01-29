@@ -24,10 +24,20 @@ def register(tree: app_commands.CommandTree):
 
             leaderboard = get_leaderboard(str(interaction.guild.id), limit=5)
 
+            if not leaderboard:
+                await interaction.response.send_message(
+                    "No one has earned XP yet. Start answering questions to get on the leaderboard!",
+                    ephemeral=True
+                )
+                return
+
             msg = "🏆 **Leaderboard**\n"
             for idx, (user_id, xp, level) in enumerate(leaderboard, start=1):
-                user = await interaction.guild.fetch_member(user_id)
-                msg += f"{idx}. {user.display_name} — {xp} XP (Level {level})\n"
+                try:
+                    user = await interaction.guild.fetch_member(user_id)
+                    msg += f"{idx}. {user.display_name} — {xp} XP (Level {level})\n"
+                except:
+                    continue
 
             await interaction.response.send_message(msg)
 
