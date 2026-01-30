@@ -83,6 +83,7 @@ def register(tree: app_commands.CommandTree):
     # UPLOAD PDF WITHOUT GENERATING QUESTIONS
     ###
     @tree.command(name="upload_pdf", description="Saves the PDF without generating questions")
+    @app_commands.default_permissions(administrator=True)
     @app_commands.describe(topic_name="Name of the topic to save the PDF under", file="PDF file with content")
     async def upload_pdf_command(interaction: discord.Interaction, topic_name: str, file: discord.Attachment):
         await interaction.response.defer(thinking=True, ephemeral=True)
@@ -129,6 +130,7 @@ def register(tree: app_commands.CommandTree):
     # UPLOAD PDF AND GENERATE QUESTIONS AUTOMATICALLY
     ###
     @tree.command(name="upload_topic", description="Uploads a PDF and automatically generates questions")
+    @app_commands.default_permissions(administrator=True)
     @app_commands.describe(topic_name="Name of the topic to save the PDF under", file="PDF file with content")
     async def upload_pdf_with_questions(interaction: discord.Interaction, topic_name: str, file: discord.Attachment):
         await interaction.response.defer(thinking=True, ephemeral=True)
