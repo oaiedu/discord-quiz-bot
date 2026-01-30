@@ -49,9 +49,10 @@ def register(tree: app_commands.CommandTree):
     @tree.command(name="topics", description="Displays the available topics for quizzes")
     async def list_topics(interaction: discord.Interaction):
         try:
-            professor_verification(interaction)
-
+            
             await interaction.response.defer(thinking=True)
+
+            professor_verification(interaction)
 
             # --- Protection for Issue #1494 ---
             try:
