@@ -65,6 +65,7 @@ def register(tree: app_commands.CommandTree):
             )
 
     @tree.command(name="user_rank", description="Display the specified user's rank")
+    @app_commands.default_permissions(administrator=True)
     @app_commands.describe(user_name="User full name")
     async def user_rank(interaction: discord.Interaction, user_name: str):
         try:
