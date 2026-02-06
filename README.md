@@ -13,17 +13,29 @@ An educational Discord bot that allows professors and students to interact throu
 
 👨‍🏫 **For Professors:**
 
-- `/upload <topic>` — Upload a PDF to generate 50 AI questions.
-- `/stats` — View quiz statistics of all students.
-- `/quiz <topic>` — Launch a quiz.
-- `/topics` — View available quiz topics.
-- `/help` — Show all available commands.
+- `/help` — Show all commands.
+- `/upload_pdf <topic> <file>` — Upload a PDF and store it (no questions generated).
+- `/upload_topic <topic> <file>` — Upload a PDF and automatically generate questions.
+- `/generate_questions <topic> <qty> <type>` — Generate multiple questions using AI.
+- `/add_question` — Add a custom question.
+- `/list_questions <topic>` — List all questions for a topic.
+- `/delete_question <topic> <id>` — Delete a question by its ID.
+- `/stats` — Show global quiz statistics.
+- `/user_stats` — Show per-user quiz attempts.
+- `/time_stats` — Show quiz activity over time.
+- `/quiz <topic>` — Launch a 5-question quiz for students.
+- `/topics` — Display available quiz topics.
+- `/my_rank` — View your XP and level.
+- `/rank` — See the top 5 leaderboard.
+- `/user_rank <name>` — Check another user’s rank.
 
 👩‍🎓 **For Students:**
 
+- `/help` — Show student commands.
 - `/quiz <topic>` — Take a 5-question quiz.
-- `/topics` — List all quiz topics.
-- `/help` — Show only student commands.
+- `/topics` — See all available topics.
+- `/my_rank` — View your XP and level.
+- `/rank` — See the top 5 leaderboard.
 
 ---
 

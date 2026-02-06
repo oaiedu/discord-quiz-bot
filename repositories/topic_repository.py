@@ -1,90 +1,121 @@
+import logging
 from firebase_init import db, bucket, SERVER_TIMESTAMP
 
-def listar_topicos(guild_id):
-    return db.collection("servers") \
-             .document(str(guild_id)) \
-             .collection("topics") \
-             .get()
 
-def criar_topico_com_perguntas(guild_id, topico, topic_id, preguntas_novas, document_url, qty, type):
-    use_topic_id = None
-    topic_ref = None
-    
-    if topic_id == None:
-        topic_ref = db.collection("servers").document(str(guild_id)).collection("topics").document()
-        new_topic_id = topic_ref.id
-        use_topic_id = new_topic_id
-        
-        topic_data = {
-            "title": topico,
-            "created_at": SERVER_TIMESTAMP,
-            "document_storage_url": document_url,
-            "num_quizzes_generated": len(preguntas_novas),
-            "topic_id": new_topic_id
-        }
-        topic_ref.set(topic_data)
-    else:
-        topic_ref = db.collection("servers").document(str(guild_id)).collection("topics").document(str(topic_id))
-        use_topic_id = topic_ref.id
-
-    batch = db.batch()
-    for idx, pregunta in enumerate(preguntas_novas):
-        doc_ref = topic_ref.collection("questions").document()
-        pregunta_id = doc_ref.id
-        batch.set(doc_ref, {
-            "question_id": pregunta_id,
-            "question": pregunta.get("pergunta"),
-            "alternatives": pregunta.get("alternativas", ""),
-            "correct_answer": pregunta.get("resposta"),
-            "question_type": type.value,
-            "success": 0,
-            "failures": 0
-        })
-    batch.commit()
-    return use_topic_id
-
-def criar_topico_sem_perguntas(guild_id, topico, document_url):
-    topic_ref = db.collection("servers").document(str(guild_id)).collection("topics").document()
-    topic_id = topic_ref.id
-    
-    topic_data = {
-        "title": topico,
-        "created_at": SERVER_TIMESTAMP,
-        "document_storage_url": document_url,
-        "num_quizzes_generated": 0,
-        "topic_id": topic_id
-    }
-    topic_ref.set(topic_data)
-
-    return topic_id
-
-def obter_topics_por_servidor(guild_id: int):
+def list_topics(guild_id):
     try:
         return db.collection("servers") \
                  .document(str(guild_id)) \
                  .collection("topics") \
                  .get()
     except Exception as e:
-        print(f"Erro ao obter tópicos para o servidor {guild_id}: {e}")
+        logging.error(f"Error listing topics for server {guild_id}: {e}")
         return []
 
-def obter_preguntas_por_topic(guild_id: int, topic: str):
+
+def create_topic_with_questions(guild_id, topic_title, topic_id, new_questions, document_url, qty, qtype):
     try:
-        colecao_topicos = db.collection("servers") \
-                            .document(str(guild_id)) \
-                            .collection("topics")
+        use_topic_id = None
+        topic_ref = None
 
-        documentos = colecao_topicos.where("title", "==", topic).limit(1).get()
+        if topic_id is None:
+            topic_ref = db.collection("servers").document(
+                str(guild_id)).collection("topics").document()
+            new_topic_id = topic_ref.id
+            use_topic_id = new_topic_id
 
-        if not documentos:
+            topic_data = {
+                "title": topic_title,
+                "created_at": SERVER_TIMESTAMP,
+                "document_storage_url": document_url,
+                "num_quizzes_generated": len(new_questions),
+                "topic_id": new_topic_id
+            }
+            topic_ref.set(topic_data)
+        else:
+            topic_ref = db.collection("servers").document(
+                str(guild_id)).collection("topics").document(str(topic_id))
+            use_topic_id = topic_ref.id
+
+        batch = db.batch()
+        for idx, question in enumerate(new_questions):
+            doc_ref = topic_ref.collection("questions").document()
+            question_id = doc_ref.id
+            batch.set(doc_ref, {
+                "question_id": question_id,
+                "question": question.get("question"),
+                "alternatives": question.get("alternatives", ""),
+                "correct_answer": question.get("answer"),
+                "question_type": qtype.value,
+                "success": 0,
+                "failures": 0
+            })
+        batch.commit()
+        logging.info(
+            f"Topic '{topic_title}' with questions created/updated in server {guild_id} (ID: {use_topic_id})")
+        return use_topic_id
+
+    except Exception as e:
+        logging.error(
+            f"Error creating topic with questions in server {guild_id}: {e}")
+        return None
+
+
+def create_topic_without_questions(guild_id, topic_title, document_url):
+    try:
+        topic_ref = db.collection("servers").document(
+            str(guild_id)).collection("topics").document()
+        topic_id = topic_ref.id
+
+        topic_data = {
+            "title": topic_title,
+            "created_at": SERVER_TIMESTAMP,
+            "document_storage_url": document_url,
+            "num_quizzes_generated": 0,
+            "topic_id": topic_id
+        }
+        topic_ref.set(topic_data)
+        logging.info(
+            f"Topic '{topic_title}' created without questions in server {guild_id} (ID: {topic_id})")
+        return topic_id
+
+    except Exception as e:
+        logging.error(
+            f"Error creating topic without questions in server {guild_id}: {e}")
+        return None
+
+
+def get_topics_by_server(guild_id: int):
+    try:
+        return db.collection("servers") \
+                 .document(str(guild_id)) \
+                 .collection("topics") \
+                 .get()
+    except Exception as e:
+        logging.error(f"Error getting topics for server {guild_id}: {e}")
+        return []
+
+
+def get_questions_by_topic(guild_id: int, topic_title: str):
+    try:
+        topic_collection = db.collection("servers") \
+            .document(str(guild_id)) \
+            .collection("topics")
+
+        documents = topic_collection.where(
+            "title", "==", topic_title).limit(1).get()
+
+        if not documents:
             return []
 
-        topic_doc = documentos[0]
+        topic_doc = documents[0]
         return topic_doc.reference.collection("questions").get()
 
     except Exception as e:
-        print(f"Erro ao obter perguntas para o tópico '{topic}': {e}")
+        logging.error(
+            f"Error getting questions for topic '{topic_title}': {e}")
         return []
+
 
 def get_topic_by_name(guild_id: int, topic_name: str):
     try:
@@ -92,27 +123,36 @@ def get_topic_by_name(guild_id: int, topic_name: str):
             .document(str(guild_id)) \
             .collection("topics")
 
-        document = topic_collection.where("title", "==", topic_name).limit(1).get()
+        document = topic_collection.where(
+            "title", "==", topic_name).limit(1).get()
 
         if not document:
             return None
 
         topic_doc = document[0]
-        return topic_doc.to_dict()  # Retorna todos os dados do documento como dict
+        return topic_doc.to_dict()
     except Exception as e:
-        print(f"Erro ao obter o tópico '{topic_name}': {e}")
+        logging.error(f"Error getting topic '{topic_name}': {e}")
         return None
-    
-def save_topic_pdf(ruta_pdf, guild_id):
-    topic_ref = db.collection("servers").document(str(guild_id)).collection("topics").document()
-    topic_id = topic_ref.id
 
-    storage_filename = f"{topic_id}.pdf"
-    blob = bucket.blob(f"{guild_id}/topics/{storage_filename}")
 
-    with open(ruta_pdf, "rb") as f:
-        blob.upload_from_file(f, content_type="application/pdf")
-        blob.make_public()
+def save_topic_pdf(pdf_path, guild_id):
+    try:
+        topic_ref = db.collection("servers").document(
+            str(guild_id)).collection("topics").document()
+        topic_id = topic_ref.id
 
-    document_url = blob.public_url
-    return document_url
+        storage_filename = f"{topic_id}.pdf"
+        blob = bucket.blob(f"{guild_id}/topics/{storage_filename}")
+
+        with open(pdf_path, "rb") as f:
+            blob.upload_from_file(f, content_type="application/pdf")
+            blob.make_public()
+
+        document_url = blob.public_url
+        logging.info(
+            f"PDF saved to bucket for server {guild_id}, topic {topic_id}")
+        return document_url
+    except Exception as e:
+        logging.error(f"Error saving topic PDF for server {guild_id}: {e}")
+        return None

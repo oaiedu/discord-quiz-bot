@@ -1,81 +1,84 @@
-def prompt_multiple_choice(topico, texto, qty):
+def prompt_multiple_choice(topic, text, qty):
     return f"""
-Você é um gerador de perguntas. Gere **exatamente {qty}** perguntas de múltipla escolha com base no conteúdo abaixo, e **não gere nenhuma pergunta extra**.
+You are a question generator. Generate **exactly {qty}** multiple-choice questions based on the content below, and **do not generate any extra questions**.
 
-Cada pergunta deve conter quatro alternativas (A, B, C, D), e apenas uma correta. A resposta correta deve ser indicada com a letra.
+Each question must have four options (A, B, C, D), and only one correct answer. The correct answer should be indicated by the letter.
 
-Formato da saída em JSON:
+Output format in JSON:
 [
 {{
-    "pergunta": "Texto da pergunta...",
-    "alternativas": {{
-        "A": "Alternativa A",
-        "B": "Alternativa B",
-        "C": "Alternativa C",
-        "D": "Alternativa D"
+    "question": "Question text...",
+    "options": {{
+        "A": "Option A",
+        "B": "Option B",
+        "C": "Option C",
+        "D": "Option D"
     }},
-    "resposta": "B"
+    "answer": "B"
 }},
 ...
-]  # Exatamente {qty} objetos como esse
+]  # Exactly {qty} objects like this
 
-Tema: {topico}
+Topic: {topic}
 
-Conteúdo:
-{texto[:4000]}
+Content:
+{text[:4000]}
 """
 
-def prompt_true_false(topico, texto, qty):
-    return f"""
-Você é um gerador de perguntas. Gere **exatamente {qty}** perguntas de verdadeiro ou falso com base no conteúdo abaixo, e **não gere nenhuma pergunta extra**.
 
-Formato da saída em JSON:
+def prompt_true_false(topic, text, qty):
+    return f"""
+You are a question generator. Generate **exactly {qty}** true/false questions based on the content below, and **do not generate any extra questions**.
+
+Output format in JSON:
 [
 {{
-    "pergunta": "Texto da pergunta...",
-    "resposta": "Verdadeiro"  # ou "Falso"
+    "question": "Question text...",
+    "answer": "True"  # or "False"
 }},
 ...
-]  # Exatamente {qty} objetos como esse
+]  # Exactly {qty} objects like this
 
-Tema: {topico}
+Topic: {topic}
 
-Conteúdo:
-{texto[:4000]}
+Content:
+{text[:4000]}
 """
 
-def prompt_short_answer(topico, texto, qty):
+
+def prompt_short_answer(topic, text, qty):
     return f"""
-    Você é um gerador de perguntas. Com base no conteúdo abaixo, gere {qty} perguntas de resposta curta, e não gere nenhuma extra. Somente {qty}.
-    Retorne em formato JSON como este:
-    [
-    {{
-        "pergunta": "...",
-        "resposta": "..."
-    }},
-    ...
-    ]
+You are a question generator. Based on the content below, generate **exactly {qty} short-answer questions**, and do not generate any extras. Only {qty}.
+Return in JSON format like this:
+[
+{{
+    "question": "...",
+    "answer": "..."
+}},
+...
+]
 
-    Tema: {topico}
+Topic: {topic}
 
-    Conteúdo:
-    {texto[:4000]}
-    """
+Content:
+{text[:4000]}
+"""
 
-def prompt_default(topico, texto, qty):
+
+def prompt_default(topic, text, qty):
     return f"""
-    Você é um gerador de perguntas. Com base no conteúdo abaixo, gere {qty} perguntas variadas, e não gere nenhuma extra. Somente {qty}.
-    Retorne em formato JSON como este:
-    [
-    {{
-        "pergunta": "...",
-        "resposta": "..."
-    }},
-    ...
-    ]
+You are a question generator. Based on the content below, generate **exactly {qty} varied questions**, and do not generate any extras. Only {qty}.
+Return in JSON format like this:
+[
+{{
+    "question": "...",
+    "answer": "..."
+}},
+...
+]
 
-    Tema: {topico}
+Topic: {topic}
 
-    Conteúdo:
-    {texto[:4000]}
-    """
+Content:
+{text[:4000]}
+"""

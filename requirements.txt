@@ -5,3 +5,5 @@ google-cloud-storage
 python-dotenv
 pytz
 matplotlib
+firebase_admin
+google-cloud-secret-manager

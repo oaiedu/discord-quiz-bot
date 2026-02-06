@@ -3,99 +3,159 @@ import discord
 import logging
 import os
 
-from repositories.topic_repository import criar_topico_sem_perguntas, obter_topics_por_servidor, save_topic_pdf
+from repositories.topic_repository import create_topic_without_questions, get_topics_by_server, save_topic_pdf
+from utils.structured_logging import structured_logger as logger
 from utils.enum import QuestionType
-from utils.utils import actualizar_ultima_interaccion, is_professor
-from utils.llm_utils import generar_preguntas_desde_pdf
+from utils.utils import professor_verification, update_last_interaction, is_professor
+from utils.llm_utils import generate_questions_from_pdf
 
-RUTA_DOCS = "docs"
+DOCS_PATH = "docs"
 
 # Function to save PDF to storage
-async def save_pdf(interaction: Interaction, archivo: discord.Attachment, nombre_topico: str):
+async def save_pdf(interaction: Interaction, file: discord.Attachment, topic_name: str):
     try:
-        if not archivo.filename.endswith(".pdf"):
-            await interaction.followup.send("❌ Only PDF files are allowed.")
+        professor_verification(interaction)
+
+        if not file.filename.endswith(".pdf"):
+            await interaction.followup.send("❌ Only PDF files are allowed.", ephemeral=True)
             return
 
-        os.makedirs(RUTA_DOCS, exist_ok=True)
-        ruta_pdf = os.path.join(RUTA_DOCS, f"{nombre_topico}.pdf")
-        await archivo.save(ruta_pdf)        
-        
-        pdf_url = save_topic_pdf(ruta_pdf, interaction.guild.id)
+        os.makedirs(DOCS_PATH, exist_ok=True)
+        pdf_path = os.path.join(DOCS_PATH, f"{topic_name}.pdf")
+        await file.save(pdf_path)
+
+        pdf_url = save_topic_pdf(pdf_path, interaction.guild.id)
         print(pdf_url)
-        
+
         if not pdf_url:
-            await interaction.response.send_message("❌ No topics available yet.") 
-        
-        if os.path.exists(ruta_pdf):
-            os.remove(ruta_pdf)
-            
+            await interaction.followup.send("❌ Storage Error: Failed to upload PDF.", ephemeral=True)
+            return None # To ensure the calling function knows it failed
+
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
+
         return pdf_url
-            
+
     except Exception as e:
-        logging.error(f"Error loading topics: {e}")
-        
+        logging.error(f"Error saving PDF: {e}")
+        return None
+
 
 def register(tree: app_commands.CommandTree):
-    
-    ### 
-    # SHOW ALL TOPICS
+
+    ###
+    # LIST ALL TOPICS
     ###
     @tree.command(name="topics", description="Displays the available topics for quizzes")
     async def list_topics(interaction: discord.Interaction):
-        actualizar_ultima_interaccion(interaction.guild.id)
-
         try:
-            temas_docs = obter_topics_por_servidor(interaction.guild.id)
+            
+            await interaction.response.defer(thinking=True)
 
-            if not temas_docs:
-                await interaction.response.send_message("❌ No topics available yet.")
-                return
+            professor_verification(interaction)
 
-            temas = "\n".join(f"- {doc.to_dict().get('title', 'Untitled')}" for doc in temas_docs)
-            await interaction.response.send_message(f"📚 Available topics:\n{temas}")
+            # --- Protection for Issue #1494 ---
+            try:
+                update_last_interaction(interaction.guild.id)
+            except Exception as e:
+                logging.warning(f"Failed to update interaction: {e}")
+
+            topics = get_topics_by_server(interaction.guild.id)
+
+            professor_verification(interaction)
+
+            topic_count = len(topics)
+            topics_list = "\n".join(
+                f"- {doc.to_dict().get('title', 'Untitled')}" for doc in topics)
+
+
+            await interaction.followup.send(f"📚 Available topics:\n{topics_list}")
+
         except Exception as e:
             logging.error(f"Error loading topics: {e}")
-            await interaction.response.send_message("❌ Error loading topics.")
 
-    ### 
-    # SAVE PDF TO STORAGE
+            try:
+                await interaction.followup.send("❌ Error loading topics.", ephemeral=True)
+            except:
+                logging.error("Failed to send error message to user")
+
+    ###
+    # UPLOAD PDF WITHOUT GENERATING QUESTIONS
     ###
     @tree.command(name="upload_pdf", description="Saves the PDF without generating questions")
-    @app_commands.describe(nombre_topico="Name of the topic to save the PDF under", archivo="PDF file with content")
-    async def upload_pdf(interaction: discord.Interaction, nombre_topico: str, archivo: discord.Attachment):
-        try:
-            actualizar_ultima_interaccion(interaction.guild.id)
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(topic_name="Name of the topic to save the PDF under", file="PDF file with content")
+    async def upload_pdf_command(interaction: discord.Interaction, topic_name: str, file: discord.Attachment):
+        await interaction.response.defer(thinking=True, ephemeral=True)
 
-            await interaction.response.defer(thinking=True)
-            
-            pdf_url = await save_pdf(interaction, archivo, nombre_topico)
-            
+        try:
+            # --- Protection for Issue #1494 ---
+            try:
+                update_last_interaction(interaction.guild.id)
+            except Exception as e:
+                logging.warning(f"Failed to update interaction: {e}")
+
+            professor_verification(interaction)
+
+            pdf_url = await save_pdf(interaction, file, topic_name)
+
+            if pdf_url is None:
+                return # Stop execution here if upload failed
+
             try:
                 guild_id = interaction.guild.id
-                criar_topico_sem_perguntas(guild_id, nombre_topico, pdf_url)
-                await interaction.followup.send("🧠 Topic created successfully, but without questions.")
+                create_topic_without_questions(guild_id, topic_name, pdf_url)
+                await interaction.followup.send("🧠 Topic created successfully, but without questions.", ephemeral=True)
+
             except Exception as e:
-                await interaction.followup.send(f"❌ Error generating questions: {e}")
+                await interaction.followup.send(f"❌ Error creating topic: {e}", ephemeral=True)
+                logger.error(f"❌ Error creating topic in /upload_pdf: {e}",
+                             command="upload_pdf",
+                             user_id=str(interaction.user.id),
+                             username=interaction.user.display_name,
+                             guild_id=str(
+                                 interaction.guild.id) if interaction.guild else None,
+                             topic=topic_name,
+                             error_type=type(e).__name__,
+                             error_message=str(e),
+                             operation="topic_creation_error")
+
         except Exception as e:
-            logging.error(f"Error loading topics: {e}")
-            await interaction.response.send_message("❌ Error loading topics.")
-            
+            try:
+                await interaction.followup.send("❌ Error loading topics.", ephemeral=True)
+            except Exception:
+                pass
+
     ###
-    # SAVE PDF AND GENERATE QUESTIONS AUTOMATICALLY
-    ###        
+    # UPLOAD PDF AND GENERATE QUESTIONS AUTOMATICALLY
+    ###
     @tree.command(name="upload_topic", description="Uploads a PDF and automatically generates questions")
-    @app_commands.describe(nombre_topico="Name of the topic to save the PDF under", archivo="PDF file with content")
-    async def upload_pdf_with_questions(interaction: discord.Interaction, nombre_topico: str, archivo: discord.Attachment):
-        actualizar_ultima_interaccion(interaction.guild.id)
-
-        await interaction.response.defer(thinking=True)
-
-        pdf_url = await save_pdf(interaction, archivo, nombre_topico)
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(topic_name="Name of the topic to save the PDF under", file="PDF file with content")
+    async def upload_pdf_with_questions(interaction: discord.Interaction, topic_name: str, file: discord.Attachment):
+        await interaction.response.defer(thinking=True, ephemeral=True)
 
         try:
+            # --- Protection for Issue #1494 ---
+            try:
+                update_last_interaction(interaction.guild.id)
+            except Exception as e:
+                logging.warning(f"Failed to update interaction: {e}")
+
+            professor_verification(interaction)
+
+            pdf_url = await save_pdf(interaction, file, topic_name)
+
+            if pdf_url is None:
+                return # Stop execution here if upload failed
+
             guild_id = interaction.guild.id
-            generar_preguntas_desde_pdf(nombre_topico, None, guild_id, pdf_url, 50, QuestionType.TRUE_FALSE)
-            await interaction.followup.send("🧠 Questions successfully generated from the PDF.")
+            generate_questions_from_pdf(
+                topic_name, None, guild_id, pdf_url, 50, QuestionType.TRUE_FALSE)
+            await interaction.followup.send("🧠 Questions successfully generated from the PDF.", ephemeral=True)
+
         except Exception as e:
-            await interaction.followup.send(f"❌ Error generating questions: {e}")
+            try:
+                await interaction.followup.send(f"❌ Error generating questions: {e}", ephemeral=True)
+            except Exception:
+                pass

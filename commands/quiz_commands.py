@@ -4,12 +4,15 @@ from discord import app_commands, Interaction, ButtonStyle
 import discord
 from discord.ui import View, Button
 
+from repositories.level_repository import add_xp, update_streak
 from repositories.question_repository import update_question_stats
-from repositories.server_repository import atualizar_ultima_interacao_servidor
-from repositories.stats_repository import guardar_estadistica
-from repositories.topic_repository import obter_preguntas_por_topic
+from repositories.server_repository import update_server_last_interaction
+from repositories.stats_repository import save_statistic
+from repositories.topic_repository import get_questions_by_topic
 from utils.enum import QuestionType
-from utils.utils import obtener_temas_autocompletado, registrar_user_estadistica
+from utils.structured_logging import structured_logger as logger
+from utils.utils import autocomplete_topics, register_user_statistics
+
 
 class QuizButton(Button):
     def __init__(self, label: str, correct_answer: str, on_click_callback, parent_view: View):
@@ -33,108 +36,158 @@ class QuizButton(Button):
 
         self.parent_view.stop()
 
+
 class QuizView(View):
-    def __init__(self, alternativas, correct_answer, on_click_callback, timeout=60):
+    def __init__(self, alternatives, correct_answer, on_click_callback, timeout=60):
         super().__init__(timeout=timeout)
-        for letra in alternativas:
-            self.add_item(QuizButton(letra, correct_answer, on_click_callback, self))
+        for letter in alternatives:
+            self.add_item(QuizButton(
+                letter, correct_answer, on_click_callback, self))
+
 
 def register(tree: app_commands.CommandTree):
-    
+
     @tree.command(name="quiz", description="Take a quiz with 5 questions on a topic")
-    @app_commands.describe(nombre_topico="Topic name")
-    @app_commands.autocomplete(nombre_topico=obtener_temas_autocompletado)
-    async def quiz(interaction: discord.Interaction, nombre_topico: str):
-        if interaction.guild:
-            atualizar_ultima_interacao_servidor(interaction.guild.id)
+    @app_commands.describe(topic_name="Topic name")
+    @app_commands.autocomplete(topic_name=autocomplete_topics)
+    async def quiz(interaction: discord.Interaction, topic_name: str):
+        await interaction.response.defer(thinking=True, ephemeral=True)
 
         try:
-            preguntas_data = obter_preguntas_por_topic(interaction.guild.id, nombre_topico)
+            if interaction.guild:
+                update_server_last_interaction(interaction.guild.id)
 
-            if not preguntas_data:
-                await interaction.response.send_message(f"❌ There are no questions registered for the topic `{nombre_topico}`.")
+            questions_data = get_questions_by_topic(
+                interaction.guild.id, topic_name)
+
+            if not questions_data:
+                await interaction.followup.send(
+                    f"❌ There are no questions registered for the topic `{topic_name}`.",
+                    ephemeral=True
+                )
+                logger.warning(f"❌ No questions found for topic: {topic_name}",
+                               command="quiz",
+                               user_id=str(interaction.user.id),
+                               username=interaction.user.display_name,
+                               guild_id=str(
+                                   interaction.guild.id) if interaction.guild else None,
+                               topic=topic_name,
+                               operation="no_questions_found")
                 return
 
-            preguntas = random.sample(preguntas_data, min(5, len(preguntas_data)))
-            
-            await interaction.response.send_message("📋 Starting the quiz...", ephemeral=True)
-            
-            respostas_usuario = []
-            async def handle_answer(interaction_inner, escolha, correta):
-                if interaction.user.id != interaction_inner.user.id:
-                    await interaction_inner.response.send_message("This quiz isn't for you!", ephemeral=True)
-                    return False
+            questions = random.sample(
+                questions_data, min(5, len(questions_data)))
 
-                respostas_usuario.append((escolha.upper(), correta.upper()))
-                return escolha.upper() == correta.upper()
+            await interaction.followup.send("📋 Starting the quiz...", ephemeral=True)
 
-            for idx, p in enumerate(preguntas):
-                data = p.to_dict()
-                question_id = p.id
-                tipo = data.get('question_type', 'True/False')
-                texto = f"**{idx+1}. {data.get('question', '')}**"
+            user_answers = []
 
-                alternativas = data.get('alternatives', {}) if tipo == QuestionType.MULTIPLE_CHOICE.value else {'T': 'True', 'F': 'False'}
+            for idx, q in enumerate(questions):
+                data = q.to_dict()
+                question_id = q.id
+                q_type = data.get('question_type', 'True/False')
+                text = f"**{idx + 1}. {data.get('question', '')}**"
 
-                for letra, alt_texto in alternativas.items():
-                    texto += f"\n{letra}. {alt_texto}"
-
-                correta = (
-                    data.get('correct_answer', '') if tipo == 'Multiple Choice'
-                    else ('T' if data.get('resposta', 'V').upper().startswith('V') else 'F')
+                alternatives = (
+                    data.get('alternatives', {})
+                    if q_type == QuestionType.MULTIPLE_CHOICE.value
+                    else {'T': 'True', 'F': 'False'}
                 )
 
-                async def answer_callback(interaction_inner, escolha, correta, question_id=question_id, p=p):
+                for letter, alt_text in alternatives.items():
+                    text += f"\n{letter}. {alt_text}"
+
+                correct = (
+                    data.get('correct_answer', '') if q_type == 'Multiple Choice'
+                    else ('T' if data.get('answer', 'T').upper().startswith('T') else 'F')
+                )
+
+                async def answer_callback(interaction_inner, choice, correct, question_id=question_id, q=q):
                     if interaction.user.id != interaction_inner.user.id:
                         await interaction_inner.response.send_message("This quiz isn't for you!", ephemeral=True)
                         return False
 
-                    is_correct = escolha.upper() == correta.upper()
-                    respostas_usuario.append((escolha.upper(), correta.upper()))
+                    is_correct = choice.upper() == correct.upper()
+                    user_answers.append((choice.upper(), correct.upper()))
 
                     try:
                         update_question_stats(
                             guild_id=interaction.guild.id,
-                            topic_id=p.reference.parent.parent.id,
+                            topic_id=q.reference.parent.parent.id,
                             question_id=question_id,
                             correct=is_correct
                         )
                     except Exception as err:
-                        logging.warning(f"Erro ao atualizar stats da pergunta {question_id}: {err}")
+                        logger.warning(f"Error updating stats for question {question_id}: {err}",
+                                       command="quiz",
+                                       user_id=str(interaction.user.id),
+                                       username=interaction.user.display_name,
+                                       guild_id=str(
+                                           interaction.guild.id) if interaction.guild else None,
+                                       question_id=question_id,
+                                       error_type=type(err).__name__,
+                                       operation="stats_update_error")
 
                     return is_correct
 
-                view = QuizView(alternativas, correta, answer_callback)
-                await interaction.followup.send(texto, view=view, ephemeral=True)
+                view = QuizView(alternatives, correct, answer_callback)
+                await interaction.followup.send(text, view=view, ephemeral=True)
 
                 timeout = await view.wait()
                 if timeout:
-                    await interaction.followup.send("⏰ Time's up for this question.")
+                    await interaction.followup.send("⏰ Time's up for this question.", ephemeral=True)
+
+                    logger.info(f"⏰ Quiz question timeout for {interaction.user.display_name}",
+                                command="quiz",
+                                user_id=str(interaction.user.id),
+                                username=interaction.user.display_name,
+                                guild_id=str(
+                                    interaction.guild.id) if interaction.guild else None,
+                                topic=topic_name,
+                                question_number=idx + 1,
+                                operation="question_timeout")
                     return
 
-            resultado = "\n📊 Results:\n"
-            correctas = 0
+            result_text = "\n📊 Results:\n"
+            correct_count = 0
 
-            for i, (r, correta) in enumerate(respostas_usuario):
-                if r == correta:
-                    resultado += f"✅ {i+1}. Correct\n"
-                    correctas += 1
+            for i, (r, correct) in enumerate(user_answers):
+                if r == correct:
+                    result_text += f"✅ {i + 1}. Correct\n"
+                    correct_count += 1
                 else:
-                    resultado += f"❌ {i+1}. Incorrect (Correct answer: {correta})\n"
+                    result_text += f"❌ {i + 1}. Incorrect (Correct answer: {correct})\n"
 
-            resultado += f"\n🏁 You answered correctly {correctas} out of {len(preguntas)} questions."
-            await interaction.followup.send(resultado, ephemeral=True)
+            result_text += f"\n🏁 You answered correctly {correct_count} out of {len(questions)} questions."
+            await interaction.followup.send(result_text, ephemeral=True)
 
-            tipos_perguntas = set()
-            for p in preguntas:
-                tipo = p.to_dict().get('question_type', 'True/False')
-                tipos_perguntas.add(tipo)
+            question_types = set()
+            for q in questions:
+                q_type = q.to_dict().get('question_type', 'True/False')
+                question_types.add(q_type)
 
-            lista_tipos = list(tipos_perguntas)
+            type_list = list(question_types)
 
-            registrar_user_estadistica(interaction.user, nombre_topico, correctas, len(preguntas), lista_tipos)
-            guardar_estadistica(interaction.guild.id, interaction.user, nombre_topico, correctas, len(preguntas))
+            register_user_statistics(
+                interaction.user, topic_name, correct_count, len(questions), type_list)
+            save_statistic(interaction.guild.id, interaction.user,
+                           topic_name, correct_count, len(questions))
+
+            xp_gain = correct_count - (len(questions) - correct_count)
+            final_xp = add_xp(str(interaction.user.id),
+                              str(interaction.guild.id), xp_gain)
+            await interaction.followup.send(
+                f"✨ You gained {xp_gain} XP! Your total is now {final_xp} XP.", ephemeral=True)
+
+            streak = update_streak(str(interaction.user.id), str(
+                interaction.guild.id), correct_count == len(questions))
+            if streak >= 3:
+                await interaction.followup.send(f"🔥 You're on a streak! ({streak} in a row)", ephemeral=True)
 
         except Exception as e:
+            try:
+                await interaction.followup.send("❌ An error occurred during the quiz.", ephemeral=True)
+            except Exception:
+                pass
             logging.error(f"Error during quiz: {e}")
-            await interaction.response.send_message("❌ An error occurred during the quiz.")
+            await interaction.response.send_message("❌ An error occurred during the quiz.", ephemeral=True)
