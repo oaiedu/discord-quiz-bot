@@ -2,3 +2,5 @@
 
 firebase_config.json
 __pycache__/
+requirements.txt
+firebase_init.py
