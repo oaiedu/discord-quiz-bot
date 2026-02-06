@@ -14,6 +14,7 @@ from utils.structured_logging import structured_logger as logger
 def register(tree: app_commands.CommandTree):
 
     @tree.command(name="stats", description="Shows a summary of the quizzes taken by all users (professors only)")
+    @app_commands.default_permissions(administrator=True)
     async def stats(interaction: discord.Interaction):
 
         try:
@@ -55,6 +56,7 @@ def register(tree: app_commands.CommandTree):
                 logging.error("Failed to send error message to user")
             
     @tree.command(name="user_stats", description="Shows a summary of quiz attempts per user (professors only)")
+    @app_commands.default_permissions(administrator=True)
     async def user_stats(interaction: discord.Interaction):
         try:
             update_server_last_interaction(interaction.guild.id)
@@ -149,6 +151,7 @@ def register(tree: app_commands.CommandTree):
                 logging.error("Failed to send error message to user")
 
     @tree.command(name="time_stats", description="Shows a summary of the quizzes taken over time (professors only)")
+    @app_commands.default_permissions(administrator=True)
     async def time_stats(interaction: discord.Interaction):
         try:
             update_server_last_interaction(interaction.guild.id)

@@ -14,6 +14,7 @@ from utils.utils import professor_verification, update_last_interaction, autocom
 def register(tree: app_commands.CommandTree):
 
     @tree.command(name="add_question", description="Add a question to a topic (Professors only)")
+    @app_commands.default_permissions(administrator=True)
     @app_commands.describe(
         topic="Topic name",
         question="Question text",
@@ -55,6 +56,7 @@ def register(tree: app_commands.CommandTree):
                 pass
 
     @tree.command(name="list_questions", description="List questions for a topic (Professors only)")
+    @app_commands.default_permissions(administrator=True)
     @app_commands.describe(topic="Topic name")
     @app_commands.autocomplete(topic=autocomplete_topics)
     async def list_questions_command(interaction: Interaction, topic: str):
@@ -103,6 +105,7 @@ def register(tree: app_commands.CommandTree):
                 pass
 
     @tree.command(name="delete_question", description="Delete a question by ID (Professors only)")
+    @app_commands.default_permissions(administrator=True)
     @app_commands.describe(topic="Topic name", id="Question ID (string)")
     @app_commands.autocomplete(topic=autocomplete_topics)
     async def delete_question_command(interaction: Interaction, topic: str, id: str):
@@ -123,6 +126,7 @@ def register(tree: app_commands.CommandTree):
                 pass
 
     @tree.command(name="generate_questions", description="Generate multiple questions for a topic (Professors only)")
+    @app_commands.default_permissions(administrator=True)
     @app_commands.describe(topic="Topic name", qty="Quantity of new questions", type="Question type")
     @app_commands.autocomplete(topic=autocomplete_topics, type=autocomplete_question_type)
     async def generate_questions_command(interaction: Interaction, topic: str, qty: int, type: str):
