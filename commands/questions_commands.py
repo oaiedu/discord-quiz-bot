@@ -1,12 +1,12 @@
 import logging
 from discord import app_commands, Interaction
 
-from repositories.question_repository import (list_questions_by_topic, add_question, delete_question)
+from repositories.question_repository import (list_questions_by_topic, add_question, delete_question, delete_all_questions_by_topic)
 from repositories.topic_repository import get_topic_by_name
 from utils.enum import QuestionType
 from utils.llm_utils import generate_questions_from_pdf
 from utils.structured_logging import structured_logger as logger
-from utils.utils import professor_verification, update_last_interaction, autocomplete_question_type, is_professor, autocomplete_topics, autocomplete_TF
+from utils.utils import professor_verification, update_last_interaction, autocomplete_question_type, is_professor, autocomplete_topics, autocomplete_all_topics, autocomplete_TF, safe_defer
 
 # Register commands
 
@@ -20,15 +20,16 @@ def register(tree: app_commands.CommandTree):
         question="Question text",
         answer="Correct answer (T or F)"
     )
-    @app_commands.autocomplete(topic=autocomplete_topics, answer=autocomplete_TF)
+    @app_commands.autocomplete(topic=autocomplete_all_topics, answer=autocomplete_TF)
     async def add_question_command(interaction: Interaction, topic: str, question: str, answer: str):
         # Immediate defer to avoid Discord timeout (3 seconds)
-        await interaction.response.defer(thinking=True, ephemeral=True)
+        if not await professor_verification(interaction):
+            return
+        if not await safe_defer(interaction, thinking=True, ephemeral=True):
+            return
 
         try:
             update_last_interaction(interaction.guild.id)
-
-            professor_verification(interaction)
 
             if answer.upper() not in ["T", "F"]:
                 await interaction.followup.send("❌ Answer must be 'V' or 'F'", ephemeral=True)
@@ -60,12 +61,13 @@ def register(tree: app_commands.CommandTree):
     @app_commands.describe(topic="Topic name")
     @app_commands.autocomplete(topic=autocomplete_topics)
     async def list_questions_command(interaction: Interaction, topic: str):
-        await interaction.response.defer(thinking=True, ephemeral=True)
+        if not await professor_verification(interaction):
+            return
+        if not await safe_defer(interaction, thinking=True, ephemeral=True):
+            return
 
         try:
             update_last_interaction(interaction.guild.id)
-
-            professor_verification(interaction)
 
             questions = list_questions_by_topic(interaction.guild.id, topic)
 
@@ -98,7 +100,7 @@ def register(tree: app_commands.CommandTree):
             for block in blocks[1:]:
                 await interaction.followup.send(block, ephemeral=True)
 
-        except Exception as e:
+        except Exception:
             try:
                 await interaction.followup.send("❌ Error in /list_questions command.", ephemeral=True)
             except Exception:
@@ -109,12 +111,13 @@ def register(tree: app_commands.CommandTree):
     @app_commands.describe(topic="Topic name", id="Question ID (string)")
     @app_commands.autocomplete(topic=autocomplete_topics)
     async def delete_question_command(interaction: Interaction, topic: str, id: str):
-        await interaction.response.defer(thinking=True, ephemeral=True)
+        if not await professor_verification(interaction):
+            return
+        if not await safe_defer(interaction, thinking=True, ephemeral=True):
+            return
 
         try:
             update_last_interaction(interaction.guild.id)
-
-            professor_verification(interaction)
 
             delete_question(interaction.guild.id, topic, id)
             await interaction.followup.send(f"🗑️ Deleted question with ID `{id}` from `{topic}`", ephemeral=True)
@@ -125,17 +128,58 @@ def register(tree: app_commands.CommandTree):
             except Exception:
                 pass
 
+    @tree.command(name="delete_all_questions", description="Delete all questions from a topic (Professors only)")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(topic="Topic name", confirm="Set to true to confirm deleting all questions")
+    @app_commands.autocomplete(topic=autocomplete_topics)
+    async def delete_all_questions_command(interaction: Interaction, topic: str, confirm: bool):
+        if not await professor_verification(interaction):
+            return
+        if not await safe_defer(interaction, thinking=True, ephemeral=True):
+            return
+
+        try:
+            update_last_interaction(interaction.guild.id)
+
+            if not confirm:
+                await interaction.followup.send(
+                    "⚠️ Deletion cancelled. Run the command again with `confirm=True` to remove all questions from this topic.",
+                    ephemeral=True,
+                )
+                return
+
+            deleted_count = delete_all_questions_by_topic(interaction.guild.id, topic)
+
+            if deleted_count == 0:
+                await interaction.followup.send(
+                    f"📭 Topic `{topic}` has no questions to delete.",
+                    ephemeral=True,
+                )
+                return
+
+            await interaction.followup.send(
+                f"🗑️ Deleted {deleted_count} questions from `{topic}`.",
+                ephemeral=True,
+            )
+
+        except Exception as e:
+            try:
+                await interaction.followup.send(f"❌ Failed to delete all questions: {e}", ephemeral=True)
+            except Exception:
+                pass
+
     @tree.command(name="generate_questions", description="Generate multiple questions for a topic (Professors only)")
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(topic="Topic name", qty="Quantity of new questions", type="Question type")
     @app_commands.autocomplete(topic=autocomplete_topics, type=autocomplete_question_type)
     async def generate_questions_command(interaction: Interaction, topic: str, qty: int, type: str):
-        await interaction.response.defer(thinking=True, ephemeral=True)
+        if not await professor_verification(interaction):
+            return
+        if not await safe_defer(interaction, thinking=True, ephemeral=True):
+            return
 
         try:
             update_last_interaction(interaction.guild.id)
-
-            professor_verification(interaction)
 
             guild_id = interaction.guild.id
             topic_data = get_topic_by_name(guild_id, topic)
@@ -154,9 +198,16 @@ def register(tree: app_commands.CommandTree):
 
             question_type = str_to_enum[type]
 
-            generate_questions_from_pdf(
+            generated = await generate_questions_from_pdf(
                 topic_name, topic_id, guild_id, topic_storage_url, 50, question_type)
-            await interaction.followup.send(f"📭 Questions generated from `{topic_name}`", ephemeral=True)
+            if generated:
+                await interaction.followup.send(f"📭 Questions generated from `{topic_name}`", ephemeral=True)
+            else:
+                interaction.extras["command_failed"] = True
+                await interaction.followup.send(
+                    f"⚠️ Could not generate questions from `{topic_name}` right now (OpenRouter failed or requires credits).",
+                    ephemeral=True
+                )
 
         except Exception as e:
             try:

@@ -1,20 +1,77 @@
 import logging
+import asyncio
 import discord
 from dotenv import load_dotenv
 import os
 from discord import app_commands
 
-from utils.keep_alive import keep_alive
-from utils.structured_logging import structured_logger as logger
-from commands import questions_commands, quiz_commands, stats_commands, topics_commands, level_commands
-from repositories.server_repository import register_server, deactivate_server, update_server_last_interaction
-from repositories.user_repository import register_single_user, register_guild_users
-from utils.utils import is_professor, log_command_event
+# Configure logging: suppress verbose discord.py logs, keep our custom logs clean
+logging.basicConfig(
+    level=logging.WARNING,  # Only show WARNING and above from all libraries
+    format='%(asctime)s %(levelname)-8s %(name)s %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+# Suppress noisy discord and aiohttp logs
+logging.getLogger("discord").setLevel(logging.WARNING)
+logging.getLogger("discord.gateway").setLevel(logging.WARNING)
+logging.getLogger("discord.client").setLevel(logging.WARNING)
+logging.getLogger("aiohttp").setLevel(logging.WARNING)
 
 load_dotenv()
 
+from utils.keep_alive import keep_alive
+from utils.structured_logging import structured_logger as logger
+from commands import questions_commands, quiz_commands, stats_commands, topics_commands, level_commands
+from repositories.server_repository import register_server, deactivate_server, update_server_last_interaction, update_server_metadata
+from repositories.user_repository import register_single_user, register_guild_users
+from utils.utils import is_professor, log_command_event, interaction_has_admin_permission
+
 DOCS_PATH = "docs"
-ROLE_PROFESSOR = "faculty"
+
+
+def get_permission_label(interaction: discord.Interaction) -> str:
+    labels = []
+    if interaction_has_admin_permission(interaction):
+        labels.append("admin")
+    if is_professor(interaction):
+        labels.append("faculty")
+
+    return "|".join(labels) if labels else "member"
+
+
+async def resolve_guild_name(interaction: discord.Interaction) -> str:
+    guild_id = interaction.guild_id
+    if interaction.guild and interaction.guild.name:
+        return interaction.guild.name
+
+    if guild_id:
+        cached_guild = interaction.client.get_guild(guild_id)
+        if cached_guild and cached_guild.name:
+            return cached_guild.name
+
+        try:
+            fetched_guild = await interaction.client.fetch_guild(guild_id)
+            if fetched_guild.name:
+                return fetched_guild.name
+        except discord.HTTPException:
+            pass
+
+    return "Unknown server"
+
+
+async def format_command_log(interaction: discord.Interaction, command_name: str, status_icon: str) -> str:
+    guild_id = interaction.guild_id
+    guild_name = await resolve_guild_name(interaction)
+    guild_id = guild_id if guild_id is not None else "N/A"
+    user_label = f"{interaction.user} ({interaction.user.id})"
+    permission_label = get_permission_label(interaction)
+    return (
+        f"{status_icon} Command Log\n"
+        f"User: {user_label}\n"
+        f"Permission: {permission_label}\n"
+        f"Server: {guild_name} ({guild_id})\n"
+        f"Command: /{command_name}"
+    )
 
 
 class QuizBot(discord.Client):
@@ -30,9 +87,18 @@ class QuizBot(discord.Client):
         GUILD_ID = int(os.getenv("DISCORD_GUILD_ID", "0"))
         if GUILD_ID:
             guild = discord.Object(id=GUILD_ID)
-            self.tree.copy_global_to(guild=guild)
-            await self.tree.sync(guild=guild)
-            print(f"🌍 Slash commands synced to guild {GUILD_ID}.")
+            try:
+                self.tree.copy_global_to(guild=guild)
+                await self.tree.sync(guild=guild)
+                print(f"🌍 Slash commands synced to guild {GUILD_ID}.")
+            except discord.Forbidden:
+                print(
+                    f"⚠ Missing access to guild {GUILD_ID}. "
+                    "Check DISCORD_GUILD_ID and that the bot is in that server. "
+                    "Falling back to global sync."
+                )
+                await self.tree.sync()
+                print("🌍 Slash commands synced globally.")
         else:
             await self.tree.sync()
             print("🌍 Slash commands synced globally.")
@@ -48,7 +114,25 @@ level_commands.register(bot.tree)
 
 @bot.event
 async def on_ready():
+    configured_guild_id = int(os.getenv("DISCORD_GUILD_ID", "0"))
+    connected_guild_ids = []
+
+    for guild in bot.guilds:
+        connected_guild_ids.append(guild.id)
+        register_server(guild)
+
     print(f"✅ Bot connected as {bot.user}")
+    if bot.guilds:
+        for guild in bot.guilds:
+            print(f"🏠 Connected guild: {guild.name} ({guild.id})")
+    else:
+        print("⚠ Bot is not connected to any guilds.")
+
+    if configured_guild_id and configured_guild_id not in connected_guild_ids:
+        print(
+            f"⚠ DISCORD_GUILD_ID {configured_guild_id} is not in the connected guild list. "
+            "Check that this bot token belongs to a bot invited to that server."
+        )
 
 
 @bot.event
@@ -114,6 +198,7 @@ async def on_member_join(member: discord.Member):
 
     try:
         register_single_user(member.guild, member)
+        update_server_metadata(member.guild)
     except Exception as e:
         log_command_event(
             "error", None,
@@ -134,6 +219,20 @@ async def on_member_join(member: discord.Member):
 
 
 @bot.event
+async def on_member_remove(member: discord.Member):
+    try:
+        update_server_metadata(member.guild)
+    except Exception as e:
+        log_command_event(
+            "warning", None,
+            f"⚠️ Error updating server metadata after member leave: {e}",
+            operation="server_metadata_update",
+            guild_id=str(member.guild.id),
+            error_type=type(e).__name__
+        )
+
+
+@bot.event
 async def on_guild_remove(guild: discord.Guild):
     print(f"🔌 Bot removed from server: {guild.name} ({guild.id})")
     try:
@@ -145,22 +244,30 @@ async def on_guild_remove(guild: discord.Guild):
 @bot.event
 async def on_app_command_completion(interaction: discord.Interaction, command: discord.app_commands.Command):
     update_server_last_interaction(interaction.guild.id)
-    
-    print(f"✅ Comando {command.name} executado por {interaction.user} no servidor {interaction.guild.name}")
 
-    log_command_event(
-        "info",
-        interaction,
-        "✅ Command completed successfully",
-        operation="command_success"
-    )
+    if interaction.extras.get("command_failed"):
+        print(await format_command_log(interaction, command.name, "⚠️"))
+        log_command_event(
+            "warning",
+            interaction,
+            "⚠️ Command finished with handled failure",
+            operation="command_handled_failure"
+        )
+    else:
+        print(await format_command_log(interaction, command.name, "✅"))
+        log_command_event(
+            "info",
+            interaction,
+            "✅ Command completed successfully",
+            operation="command_success"
+        )
 
 
 @bot.event
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     update_server_last_interaction(interaction.guild.id)
-    
-    print(f"❌ Erro no comando {interaction.command.name}: {error}")
+
+    print(f"❌ Error in command {interaction.command.name}: {error}")
 
     log_command_event(
         "error",
@@ -172,15 +279,12 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
     )
 
     try:
-        await interaction.response.send_message("⚠️ Ocorreu um erro ao executar este comando.", ephemeral=True)
+        await interaction.response.send_message("⚠️ An error occurred while executing this command.", ephemeral=True)
     except discord.InteractionResponded:
-        await interaction.followup.send("⚠️ Ocorreu um erro ao executar este comando.", ephemeral=True)
+        await interaction.followup.send("⚠️ An error occurred while executing this command.", ephemeral=True)
 
 
-@bot.tree.interaction_check
 async def global_command_check(interaction: discord.Interaction) -> bool:
-    print(f"📢 {interaction.user} called {interaction.command.name} in server {interaction.guild.name}")
-
     log_command_event(
         "info",
         interaction,
@@ -189,22 +293,18 @@ async def global_command_check(interaction: discord.Interaction) -> bool:
     )
 
     update_server_last_interaction(interaction.guild.id)
+    await asyncio.sleep(0)
     return True
+
+
+bot.tree.interaction_check = global_command_check
 
 
 @bot.tree.command(name="help", description="Explains how to use the bot and its available commands")
 async def help_command(interaction: discord.Interaction):
-    await interaction.response.defer(thinking=True, ephemeral=True)
-
-    log_command_event(
-        "info",
-        interaction,
-        f"🔍 Command /help executed by {interaction.user.display_name}",
-        operation="command_execution"
-    )
-
     try:
-        update_server_last_interaction(interaction.guild.id)
+        if not interaction.response.is_done():
+            await interaction.response.defer(thinking=True, ephemeral=True)
 
         if is_professor(interaction):
             message = (
@@ -239,9 +339,23 @@ async def help_command(interaction: discord.Interaction):
                 "🧠 Happy practicing!"
             )
 
-        await interaction.followup.send(message, ephemeral=True)
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
 
     except Exception as e:
+        if isinstance(e, discord.HTTPException) and e.code in (40060, 10062):
+            log_command_event(
+                "warning",
+                interaction,
+                f"⚠ Ignoring duplicate or expired interaction in /help: {e}",
+                operation="command_duplicate_interaction",
+                error_type=type(e).__name__,
+                error_message=str(e)
+            )
+            return
+
         log_command_event(
             "error",
             interaction,

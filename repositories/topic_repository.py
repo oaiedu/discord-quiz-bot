@@ -41,11 +41,14 @@ def create_topic_with_questions(guild_id, topic_title, topic_id, new_questions, 
         for idx, question in enumerate(new_questions):
             doc_ref = topic_ref.collection("questions").document()
             question_id = doc_ref.id
+            answer_value = question.get("answer")
+            if answer_value in (None, ""):
+                answer_value = question.get("correct_answer")
             batch.set(doc_ref, {
                 "question_id": question_id,
                 "question": question.get("question"),
                 "alternatives": question.get("alternatives", ""),
-                "correct_answer": question.get("answer"),
+                "correct_answer": answer_value,
                 "question_type": qtype.value,
                 "success": 0,
                 "failures": 0
@@ -85,12 +88,16 @@ def create_topic_without_questions(guild_id, topic_title, document_url):
         return None
 
 
-def get_topics_by_server(guild_id: int):
+def get_topics_by_server(guild_id: int, include_empty: bool = True):
     try:
-        return db.collection("servers") \
-                 .document(str(guild_id)) \
-                 .collection("topics") \
-                 .get()
+        topic_collection = db.collection("servers") \
+                             .document(str(guild_id)) \
+                             .collection("topics")
+
+        if include_empty:
+            return topic_collection.get()
+
+        return topic_collection.where("num_quizzes_generated", ">", 0).get()
     except Exception as e:
         logging.error(f"Error getting topics for server {guild_id}: {e}")
         return []

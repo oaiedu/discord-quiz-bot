@@ -78,7 +78,8 @@ def register(tree: app_commands.CommandTree):
         try:
             update_last_interaction(interaction.guild.id)
 
-            professor_verification(interaction)
+            if not await professor_verification(interaction):
+                return
 
             xp, level = get_user_xp_by_name(
                 user_name, str(interaction.guild.id))

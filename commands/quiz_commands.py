@@ -1,5 +1,6 @@
 import logging
 import random
+import re
 from discord import app_commands, Interaction, ButtonStyle
 import discord
 from discord.ui import View, Button
@@ -11,7 +12,7 @@ from repositories.stats_repository import save_statistic
 from repositories.topic_repository import get_questions_by_topic
 from utils.enum import QuestionType
 from utils.structured_logging import structured_logger as logger
-from utils.utils import autocomplete_topics, register_user_statistics
+from utils.utils import autocomplete_quiz_topics, register_user_statistics, safe_defer
 
 
 class QuizButton(Button):
@@ -45,13 +46,48 @@ class QuizView(View):
                 letter, correct_answer, on_click_callback, self))
 
 
+def _normalize_true_false(value: str) -> str | None:
+    if value is None:
+        return None
+
+    if isinstance(value, bool):
+        return "T" if value else "F"
+
+    normalized = str(value).strip().upper()
+    if not normalized:
+        return None
+
+    # Accept values like "False.", "(True)", or "The answer is false".
+    normalized = re.sub(r"[^A-Z]", "", normalized)
+
+    if normalized in {"T", "TRUE", "V", "VERDADERO"}:
+        return "T"
+    if normalized in {"F", "FALSE", "FALSO"}:
+        return "F"
+    if "FALSE" in normalized or normalized.startswith("F"):
+        return "F"
+    if "TRUE" in normalized or normalized.startswith("T"):
+        return "T"
+    return None
+
+
+def _extract_true_false_answer(data: dict) -> str | None:
+    for key in ("correct_answer", "answer", "correctAnswer"):
+        value = data.get(key)
+        normalized = _normalize_true_false(value)
+        if normalized:
+            return normalized
+    return None
+
+
 def register(tree: app_commands.CommandTree):
 
     @tree.command(name="quiz", description="Take a quiz with 5 questions on a topic")
     @app_commands.describe(topic_name="Topic name")
-    @app_commands.autocomplete(topic_name=autocomplete_topics)
+    @app_commands.autocomplete(topic_name=autocomplete_quiz_topics)
     async def quiz(interaction: discord.Interaction, topic_name: str):
-        await interaction.response.defer(thinking=True, ephemeral=True)
+        if not await safe_defer(interaction, thinking=True, ephemeral=True):
+            return
 
         try:
             if interaction.guild:
@@ -97,10 +133,23 @@ def register(tree: app_commands.CommandTree):
                 for letter, alt_text in alternatives.items():
                     text += f"\n{letter}. {alt_text}"
 
-                correct = (
-                    data.get('correct_answer', '') if q_type == 'Multiple Choice'
-                    else ('T' if data.get('answer', 'T').upper().startswith('T') else 'F')
-                )
+                if q_type == QuestionType.MULTIPLE_CHOICE.value:
+                    correct = str(data.get('correct_answer', '')).strip().upper()
+                else:
+                    correct = _extract_true_false_answer(data)
+                    if not correct:
+                        logger.warning(
+                            "Skipping malformed True/False question due to invalid answer field.",
+                            command="quiz",
+                            user_id=str(interaction.user.id),
+                            username=interaction.user.display_name,
+                            guild_id=str(interaction.guild.id) if interaction.guild else None,
+                            topic=topic_name,
+                            question_id=question_id,
+                            raw_answer=str(data.get("correct_answer", data.get("answer"))),
+                            operation="invalid_true_false_answer"
+                        )
+                        continue
 
                 async def answer_callback(interaction_inner, choice, correct, question_id=question_id, q=q):
                     if interaction.user.id != interaction_inner.user.id:
@@ -147,9 +196,15 @@ def register(tree: app_commands.CommandTree):
                                 question_number=idx + 1,
                                 operation="question_timeout")
                     return
-
             result_text = "\n📊 Results:\n"
             correct_count = 0
+
+            if not user_answers:
+                await interaction.followup.send(
+                    "❌ No valid questions were found for this quiz topic. Please review the stored answers.",
+                    ephemeral=True,
+                )
+                return
 
             for i, (r, correct) in enumerate(user_answers):
                 if r == correct:
@@ -158,7 +213,7 @@ def register(tree: app_commands.CommandTree):
                 else:
                     result_text += f"❌ {i + 1}. Incorrect (Correct answer: {correct})\n"
 
-            result_text += f"\n🏁 You answered correctly {correct_count} out of {len(questions)} questions."
+            result_text += f"\n🏁 You answered correctly {correct_count} out of {len(user_answers)} questions."
             await interaction.followup.send(result_text, ephemeral=True)
 
             question_types = set()
@@ -169,18 +224,18 @@ def register(tree: app_commands.CommandTree):
             type_list = list(question_types)
 
             register_user_statistics(
-                interaction.user, topic_name, correct_count, len(questions), type_list)
+                interaction.user, topic_name, correct_count, len(user_answers), type_list)
             save_statistic(interaction.guild.id, interaction.user,
-                           topic_name, correct_count, len(questions))
+                           topic_name, correct_count, len(user_answers))
 
-            xp_gain = correct_count - (len(questions) - correct_count)
+            xp_gain = correct_count - (len(user_answers) - correct_count)
             final_xp = add_xp(str(interaction.user.id),
                               str(interaction.guild.id), xp_gain)
             await interaction.followup.send(
-                f"✨ You gained {xp_gain} XP! Your total is now {final_xp} XP.", ephemeral=True)
+                f"✨ You gained {xp_gain} XP! Your total is now {final_xp} XP. Continue answering questions to earn more!", ephemeral=True)
 
             streak = update_streak(str(interaction.user.id), str(
-                interaction.guild.id), correct_count == len(questions))
+                interaction.guild.id), correct_count == len(user_answers))
             if streak >= 3:
                 await interaction.followup.send(f"🔥 You're on a streak! ({streak} in a row)", ephemeral=True)
 

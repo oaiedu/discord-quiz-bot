@@ -3,12 +3,22 @@ from firebase_admin import credentials, firestore, storage
 import os
 import json
 from google.cloud import secretmanager
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def get_firebase_credentials():
     """Gets Firebase credentials (from Secret Manager or GCP default)."""
-    
+
     if os.getenv("ENVIRONMENT", "local") == "local" and os.path.exists("firebase_config.json"):
         return credentials.Certificate("firebase_config.json")
+
+    firebase_config = os.getenv("FIREBASE_CONFIG")
+    if firebase_config:
+        try:
+            return credentials.Certificate(json.loads(firebase_config))
+        except Exception as e:
+            print(f"⚠️ Invalid FIREBASE_CONFIG JSON: {e}")
     
     try:
         project_id = os.getenv("GOOGLE_CLOUD_PROJECT")

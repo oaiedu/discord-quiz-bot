@@ -10,6 +10,7 @@ class StructuredLogger:
     def __init__(self, name="discord-quiz-bot"):
         self.logger = logging.getLogger(name)
         self.logger.setLevel(logging.INFO)
+        self.logger.propagate = False  # Prevent logs from propagating to root logger
 
         # Remove existing handlers
         for handler in self.logger.handlers:

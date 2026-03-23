@@ -34,6 +34,7 @@ async def handle_upload(ctx, topic_name):
 
 
 async def handle_quiz(ctx, topic_name):
+    print('asdasdasdasd');
     if not os.path.exists("questions.json"):
         await ctx.send("❌ The file `questions.json` was not found.")
         return

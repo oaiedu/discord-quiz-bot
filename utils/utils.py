@@ -12,25 +12,63 @@ from utils.enum import QuestionType
 ROLE_PROFESSOR = "faculty"
 
 
+def get_interaction_role_names(interaction: discord.Interaction) -> list[str]:
+    member = interaction.user
+    if isinstance(member, discord.Member):
+        return [role.name.lower() for role in member.roles]
+
+    guild = interaction.guild
+    data = getattr(interaction, "data", None) or {}
+    member_data = data.get("member", {})
+    role_ids = member_data.get("roles", [])
+
+    if not guild or not role_ids:
+        return []
+
+    role_names = []
+    for role_id in role_ids:
+        role = guild.get_role(int(role_id))
+        if role:
+            role_names.append(role.name.lower())
+
+    return role_names
+
+
+def interaction_has_admin_permission(interaction: discord.Interaction) -> bool:
+    member = interaction.user
+    if isinstance(member, discord.Member):
+        return member.guild_permissions.administrator
+
+    data = getattr(interaction, "data", None) or {}
+    member_data = data.get("member", {})
+    permissions_value = member_data.get("permissions")
+    if permissions_value is None:
+        return False
+
+    try:
+        permissions = discord.Permissions(int(permissions_value))
+    except (TypeError, ValueError):
+        return False
+
+    return permissions.administrator
+
+
 def is_professor(interaction: discord.Interaction) -> bool:
-    return interaction.guild and any(
-        role.name.lower() == ROLE_PROFESSOR.lower()
-        for role in interaction.user.roles
-    )
+    return bool(interaction.guild) and ROLE_PROFESSOR.lower() in get_interaction_role_names(interaction)
 
 
 def update_last_interaction(guild_id: int):
     update_server_last_interaction(guild_id)
 
 
-def get_topics_for_autocomplete(guild_id: int):
-    documents = get_topics_by_server(guild_id)
+def get_topics_for_autocomplete(guild_id: int, *, include_empty: bool = True):
+    documents = get_topics_by_server(guild_id, include_empty=include_empty)
     return [doc.to_dict().get("title", "Untitled") for doc in documents]
 
 
 async def autocomplete_topics(interaction: discord.Interaction, current: str):
     try:
-        topics = get_topics_for_autocomplete(interaction.guild.id) or []
+        topics = get_topics_for_autocomplete(interaction.guild.id, include_empty=False) or []
         return [
             app_commands.Choice(name=topic, value=topic)
             for topic in topics if current.lower() in topic.lower()
@@ -38,6 +76,32 @@ async def autocomplete_topics(interaction: discord.Interaction, current: str):
     except Exception as e:
         logger.error(f"❌ Error in autocomplete_topics: {e}", exc_info=True)
         print(f"❌ Error in autocomplete_topics: {e}")
+        return []
+
+
+async def autocomplete_quiz_topics(interaction: discord.Interaction, current: str):
+    try:
+        topics = get_topics_for_autocomplete(interaction.guild.id, include_empty=False) or []
+        return [
+            app_commands.Choice(name=topic, value=topic)
+            for topic in topics if current.lower() in topic.lower()
+        ][:25]
+    except Exception as e:
+        logger.error(f"❌ Error in autocomplete_quiz_topics: {e}", exc_info=True)
+        print(f"❌ Error in autocomplete_quiz_topics: {e}")
+        return []
+
+
+async def autocomplete_all_topics(interaction: discord.Interaction, current: str):
+    try:
+        topics = get_topics_for_autocomplete(interaction.guild.id, include_empty=True) or []
+        return [
+            app_commands.Choice(name=topic, value=topic)
+            for topic in topics if current.lower() in topic.lower()
+        ][:25]
+    except Exception as e:
+        logger.error(f"❌ Error in autocomplete_all_topics: {e}", exc_info=True)
+        print(f"❌ Error in autocomplete_all_topics: {e}")
         return []
 
 
@@ -105,21 +169,47 @@ def log_command_event(level: str, interaction, message: str, operation: str, **k
         operation=operation,
         **kwargs
     )
+
+
+async def safe_defer(interaction: Interaction, *, thinking: bool = True, ephemeral: bool = True) -> bool:
+    if interaction.response.is_done():
+        return True
+
+    try:
+        await interaction.response.defer(thinking=thinking, ephemeral=ephemeral)
+        return True
+    except discord.HTTPException as error:
+        if error.code in (40060, 10062):
+            log_command_event(
+                "warning",
+                interaction,
+                f"⚠ Ignoring duplicate or expired interaction: {error}",
+                operation="command_duplicate_interaction",
+                error_type=type(error).__name__,
+                error_message=str(error)
+            )
+            return False
+        raise
     
-async def professor_verification(interaction: Interaction):
-    
-    if not is_professor(interaction):
+async def professor_verification(interaction: Interaction) -> bool:
+    if is_professor(interaction):
+        return True
+
+    if interaction.response.is_done():
+        await interaction.followup.send(
+            "⛔ This command is for professors only.", ephemeral=True
+        )
+    else:
         await interaction.response.send_message(
             "⛔ This command is for professors only.", ephemeral=True
         )
-                
-        logger.warning(
-            f"❌ Unauthorized user attempted /user_rank: {interaction.user.display_name}",
-            command="user_rank",
-            user_id=str(interaction.user.id),
-            username=interaction.user.display_name,
-            guild_id=str(
-                interaction.guild.id) if interaction.guild else None,
-            operation="permission_denied"
-        )
-        return    
+
+    logger.warning(
+        f"❌ Unauthorized user attempted /{interaction.command.name if interaction.command else 'unknown'}: {interaction.user.display_name}",
+        command=interaction.command.name if interaction.command else "unknown",
+        user_id=str(interaction.user.id),
+        username=interaction.user.display_name,
+        guild_id=str(interaction.guild.id) if interaction.guild else None,
+        operation="permission_denied"
+    )
+    return False

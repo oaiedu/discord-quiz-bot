@@ -7,7 +7,7 @@ import discord
 
 from repositories import stats_repository, quiz_repository
 from repositories.server_repository import update_server_last_interaction
-from utils.utils import is_professor, professor_verification
+from utils.utils import is_professor, professor_verification, safe_defer
 from utils.structured_logging import structured_logger as logger
 
 
@@ -20,9 +20,11 @@ def register(tree: app_commands.CommandTree):
         try:
             update_server_last_interaction(interaction.guild.id)
 
-            professor_verification(interaction)
+            if not await professor_verification(interaction):
+                return
 
-            await interaction.response.defer(thinking=True, ephemeral=True)
+            if not await safe_defer(interaction, thinking=True, ephemeral=True):
+                return
 
             data = stats_repository.get_statistics_by_server(interaction.guild.id)
 
@@ -61,10 +63,12 @@ def register(tree: app_commands.CommandTree):
         try:
             update_server_last_interaction(interaction.guild.id)
 
-            professor_verification(interaction)
+            if not await professor_verification(interaction):
+                return
 
             # Defer early, since we're doing heavy processing
-            await interaction.response.defer(thinking=True, ephemeral=True)
+            if not await safe_defer(interaction, thinking=True, ephemeral=True):
+                return
 
             data = stats_repository.get_statistics_by_server(
                 interaction.guild.id)
@@ -156,9 +160,11 @@ def register(tree: app_commands.CommandTree):
         try:
             update_server_last_interaction(interaction.guild.id)
 
-            professor_verification(interaction)
+            if not await professor_verification(interaction):
+                return
 
-            await interaction.response.defer(thinking=True, ephemeral=True)
+            if not await safe_defer(interaction, thinking=True, ephemeral=True):
+                return
 
             temporal_data = quiz_repository.get_quizzes_by_period(
                 interaction.guild.id)
