@@ -314,6 +314,7 @@ async def help_command(interaction: discord.Interaction):
                 "👉 `/upload_pdf <topic> <file>` — Upload a PDF (no questions generated).\n"
                 "👉 `/upload_topic <topic> <file>` — Upload a PDF and automatically generate True/False questions.\n\n"
                 "👉 `/generate_questions <topic> <qty> <type>` — Generate multiple questions for a topic.\n"
+                "👉 `/upload_questions_json <topic> <type> <file>` — Upload questions in bulk from a JSON file.\n"
                 "👉 `/add_question` — Add a question manually.\n"
                 "👉 `/list_questions <topic>` — List all questions in a topic.\n"
                 "👉 `/delete_question <topic> <id>` — Delete a specific question.\n\n"

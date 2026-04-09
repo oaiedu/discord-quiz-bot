@@ -124,8 +124,6 @@ def register(tree: app_commands.CommandTree):
     ###
     @tree.command(name="topics", description="Displays the available topics for quizzes")
     async def list_topics(interaction: discord.Interaction):
-        if not await professor_verification(interaction):
-            return
         if not await safe_defer(interaction, thinking=True, ephemeral=False):
             return
 
