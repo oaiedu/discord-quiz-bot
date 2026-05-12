@@ -12,7 +12,7 @@ from repositories.stats_repository import save_statistic
 from repositories.topic_repository import get_questions_by_topic
 from utils.enum import QuestionType
 from utils.structured_logging import structured_logger as logger
-from utils.utils import autocomplete_topics, is_professor, professor_verification, register_user_statistics, update_last_interaction
+from utils.utils import autocomplete_topics, is_professor, professor_verification, register_user_statistics, update_last_interaction, safe_defer
 
 
 def register(tree: app_commands.CommandTree):
@@ -48,6 +48,9 @@ def register(tree: app_commands.CommandTree):
     @tree.command(name="my_rank", description="Show your XP and level")
     async def personal_rank(interaction: discord.Interaction):
         try:
+            if not await safe_defer(interaction, thinking=True, ephemeral=True):
+                return
+
             update_last_interaction(interaction.guild.id)
 
             xp, level = get_user_xp(
@@ -58,7 +61,7 @@ def register(tree: app_commands.CommandTree):
             percent = int((xp_current_level / 100) * 10)
             bar = "🔵" * percent + "⚪" * (10 - percent)
 
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"**{interaction.user.display_name}**\n"
                 f"Level {level} ({xp_current_level}/{100} XP)\n"
                 f"{bar}",
@@ -66,7 +69,7 @@ def register(tree: app_commands.CommandTree):
             )
 
         except Exception as e:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "❌ An error occurred while fetching your rank.",
                 ephemeral=True
             )
