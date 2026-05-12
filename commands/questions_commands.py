@@ -199,7 +199,7 @@ def register(tree: app_commands.CommandTree):
             question_type = str_to_enum[type]
 
             generated = await generate_questions_from_pdf(
-                topic_name, topic_id, guild_id, topic_storage_url, 50, question_type)
+                topic_name, topic_id, guild_id, topic_storage_url, qty, question_type)
             if generated:
                 await interaction.followup.send(f"📭 Questions generated from `{topic_name}`", ephemeral=True)
             else:

@@ -5,6 +5,8 @@ import json
 import asyncio
 import aiohttp
 import fitz
+from urllib.parse import urlparse
+from firebase_init import bucket
 from google.cloud import storage
 from repositories.topic_repository import create_topic_with_questions
 from utils.enum import QuestionType
@@ -253,15 +255,29 @@ def _extract_text_from_pdf_bytes(pdf_bytes):
 
 
 async def extract_text_from_pdf_url(pdf_url):
-    timeout = aiohttp.ClientTimeout(total=60)
     try:
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(pdf_url) as response:
-                if response.status != 200:
-                    print(f"⚠️ Could not download PDF (HTTP {response.status})")
-                    return None
+        parsed = urlparse(pdf_url)
 
-                pdf_bytes = await response.read()
+        if parsed.scheme == "gs":
+            bucket_name = parsed.netloc
+            object_path = parsed.path.lstrip("/")
+
+            if not bucket_name or not object_path:
+                print("⚠️ Invalid gs:// URI for PDF")
+                return None
+
+            target_bucket = bucket if bucket_name == bucket.name else bucket.client.bucket(bucket_name)
+            target_blob = target_bucket.blob(object_path)
+            pdf_bytes = await asyncio.to_thread(target_blob.download_as_bytes)
+        else:
+            timeout = aiohttp.ClientTimeout(total=60)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(pdf_url) as response:
+                    if response.status != 200:
+                        print(f"⚠️ Could not download PDF (HTTP {response.status})")
+                        return None
+
+                    pdf_bytes = await response.read()
 
         text = await asyncio.to_thread(_extract_text_from_pdf_bytes, pdf_bytes)
         if not text:
