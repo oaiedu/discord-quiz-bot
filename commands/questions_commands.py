@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from discord import app_commands, Interaction
 
 from repositories.question_repository import (list_questions_by_topic, add_question, delete_question, delete_all_questions_by_topic)
@@ -198,8 +199,12 @@ def register(tree: app_commands.CommandTree):
 
             question_type = str_to_enum[type]
 
-            generated = await generate_questions_from_pdf(
-                topic_name, topic_id, guild_id, topic_storage_url, 50, question_type)
+            generated = await asyncio.wait_for(
+                generate_questions_from_pdf(
+                    topic_name, topic_id, guild_id, topic_storage_url, qty, question_type
+                ),
+                timeout=180,
+            )
             if generated:
                 await interaction.followup.send(f"📭 Questions generated from `{topic_name}`", ephemeral=True)
             else:
@@ -208,6 +213,16 @@ def register(tree: app_commands.CommandTree):
                     f"⚠️ Could not generate questions from `{topic_name}` right now (OpenRouter failed or requires credits).",
                     ephemeral=True
                 )
+
+        except asyncio.TimeoutError:
+            interaction.extras["command_failed"] = True
+            try:
+                await interaction.followup.send(
+                    "⏱️ The generation took too long. Try with a smaller qty (e.g., 5-10) or retry in a moment.",
+                    ephemeral=True,
+                )
+            except Exception:
+                pass
 
         except Exception as e:
             try:
