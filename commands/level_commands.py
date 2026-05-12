@@ -12,7 +12,7 @@ from repositories.stats_repository import save_statistic
 from repositories.topic_repository import get_questions_by_topic
 from utils.enum import QuestionType
 from utils.structured_logging import structured_logger as logger
-from utils.utils import autocomplete_topics, is_professor, professor_verification, register_user_statistics, update_last_interaction
+from utils.utils import autocomplete_topics, is_professor, professor_verification, register_user_statistics, update_last_interaction, safe_defer
 
 
 def register(tree: app_commands.CommandTree):
@@ -45,31 +45,50 @@ def register(tree: app_commands.CommandTree):
                 ephemeral=True
             )
 
-    @tree.command(name="my_rank", description="Show your XP and level")
-    async def personal_rank(interaction: discord.Interaction):
+    @tree.command(name="my_rank", description="Display your XP progress and level")
+    async def my_rank(interaction: discord.Interaction):
+        if not await safe_defer(interaction, thinking=True, ephemeral=True):
+            return
+
         try:
-            update_last_interaction(interaction.guild.id)
+            guild_id = interaction.guild_id
+            if guild_id is None:
+                await interaction.followup.send(
+                    "⛔ This command can only be used inside a server.",
+                    ephemeral=True
+                )
+                return
 
-            xp, level = get_user_xp(
-                str(interaction.user.id), str(interaction.guild.id))
+            try:
+                update_last_interaction(guild_id)
+            except Exception as e:
+                logging.warning(f"Failed to update interaction: {e}")
 
-            xp_for_next = 100 * level
-            xp_current_level = xp - (100 * (level - 1))
-            percent = int((xp_current_level / 100) * 10)
-            bar = "🔵" * percent + "⚪" * (10 - percent)
+            xp, level = get_user_xp(str(interaction.user.id), str(guild_id))
 
-            await interaction.response.send_message(
-                f"**{interaction.user.display_name}**\n"
-                f"Level {level} ({xp_current_level}/{100} XP)\n"
+            level = max(1, int(level))
+            xp_floor = 100 * (level - 1)
+            xp_cap = 100 * level
+            xp_in_level = max(0, xp - xp_floor)
+            xp_needed = max(1, xp_cap - xp_floor)
+            progress = min(10, max(0, int((xp_in_level / xp_needed) * 10)))
+            bar = "🔵" * progress + "⚪" * (10 - progress)
+
+            await interaction.followup.send(
+                f"📊 Your Rank\n"
+                f"Level {level} ({xp_in_level}/{xp_needed} XP)\n"
                 f"{bar}",
                 ephemeral=True
             )
-
         except Exception as e:
-            await interaction.response.send_message(
-                "❌ An error occurred while fetching your rank.",
-                ephemeral=True
-            )
+            logging.exception(f"Error in /my_rank: {e}")
+            try:
+                await interaction.followup.send(
+                    "❌ An error occurred while fetching your rank.",
+                    ephemeral=True
+                )
+            except Exception:
+                pass
 
     @tree.command(name="user_rank", description="Display the specified user's rank")
     @app_commands.default_permissions(administrator=True)
