@@ -21,12 +21,16 @@ FALLBACK_MODELS = [
     model.strip() for model in os.getenv("OPENROUTER_FALLBACK_MODELS", "").split(",") if model.strip()
 ]
 OPENROUTER_MODELS = list(dict.fromkeys([LLM_MODEL, *FALLBACK_MODELS]))
+OPENROUTER_TIMEOUT_SECONDS = int(os.getenv("OPENROUTER_TIMEOUT_SECONDS", "45"))
+OPENROUTER_MAX_RETRIES = int(os.getenv("OPENROUTER_MAX_RETRIES", "2"))
+OPENROUTER_BASE_WAIT_SECONDS = int(os.getenv("OPENROUTER_BASE_WAIT_SECONDS", "2"))
+OPENROUTER_AUTO_FALLBACK = os.getenv("OPENROUTER_AUTO_FALLBACK", "true").lower() in ("1", "true", "yes")
 
 QUESTIONS_JSON_FILE = "questions.json"
 MAX_PDF_TEXT_CHARS = 24000
 
 
-async def _make_api_request_with_retry(url, headers, payload, max_retries=3, base_wait=2):
+async def _make_api_request_with_retry(url, headers, payload, max_retries=None, base_wait=None):
     """Make API request to OpenRouter with exponential backoff on 429 errors.
     
     Args:
@@ -39,7 +43,10 @@ async def _make_api_request_with_retry(url, headers, payload, max_retries=3, bas
     Returns:
         Response object or None on failure
     """
-    timeout = aiohttp.ClientTimeout(total=60)
+    max_retries = OPENROUTER_MAX_RETRIES if max_retries is None else max_retries
+    base_wait = OPENROUTER_BASE_WAIT_SECONDS if base_wait is None else base_wait
+
+    timeout = aiohttp.ClientTimeout(total=OPENROUTER_TIMEOUT_SECONDS)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         for attempt in range(max_retries + 1):
             try:
@@ -88,7 +95,7 @@ async def _make_api_request_with_retry(url, headers, payload, max_retries=3, bas
                     continue
                 return None, str(e)
     
-    return None
+    return None, "unknown_error"
 
 
 async def send_to_openrouter(messages):
@@ -120,6 +127,10 @@ async def send_to_openrouter(messages):
                 "content": messages
             }]
 
+        timed_out_models = []
+        rate_limited_models = []
+        invalid_models = []
+
         for model in OPENROUTER_MODELS:
             payload = {
                 "model": model,
@@ -131,6 +142,7 @@ async def send_to_openrouter(messages):
 
             if status is None:
                 print(f"⚠️ Model '{model}' failed due to network/timeout; trying next fallback if available.")
+                timed_out_models.append(model)
                 continue
 
             if status == 402:
@@ -139,21 +151,61 @@ async def send_to_openrouter(messages):
 
             if status == 404:
                 print(f"⚠️ Model '{model}' not found (HTTP 404). Trying next fallback.")
+                invalid_models.append(model)
                 continue
+
+            if status == 400:
+                print(f"⚠️ Model '{model}' returned HTTP 400. Trying next fallback.")
+                print(f"   - Response: {body_text}")
+                invalid_models.append(model)
+                continue
+
+            if status == 429:
+                rate_limited_models.append(model)
 
             if status >= 400:
                 print(f"⚠️ Model '{model}' returned HTTP {status}. Trying next fallback.")
                 print(f"   - Response: {body_text}")
                 continue
 
-            data = json.loads(body_text)
+            try:
+                data = json.loads(body_text)
+            except json.JSONDecodeError:
+                print(f"⚠️ Invalid JSON response from model '{model}'. Trying next fallback.")
+                continue
+
             if "choices" not in data or len(data["choices"]) == 0:
                 print(f"⚠️ Invalid response from model '{model}': {data}")
                 continue
 
             return data["choices"][0]["message"]["content"]
 
+        if OPENROUTER_AUTO_FALLBACK and "openrouter/auto" not in OPENROUTER_MODELS:
+            print("⚠️ Trying final fallback model: openrouter/auto")
+            auto_payload = {
+                "model": "openrouter/auto",
+                "messages": messages,
+                "temperature": 0.7
+            }
+            status, body_text = await _make_api_request_with_retry(
+                url, headers, auto_payload, max_retries=1, base_wait=1
+            )
+
+            if status is not None and status < 400:
+                try:
+                    data = json.loads(body_text)
+                    if "choices" in data and len(data["choices"]) > 0:
+                        return data["choices"][0]["message"]["content"]
+                except json.JSONDecodeError:
+                    pass
+
         print(f"⛔ All configured models failed: {OPENROUTER_MODELS}")
+        if invalid_models:
+            print(f"   - Invalid model IDs detected: {invalid_models}")
+        if rate_limited_models:
+            print(f"   - Rate-limited models: {rate_limited_models}")
+        if timed_out_models:
+            print(f"   - Timeout/network models: {timed_out_models}")
         return None
         
     except aiohttp.ClientError as e:
