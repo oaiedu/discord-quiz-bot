@@ -68,7 +68,11 @@ def get_topics_for_autocomplete(guild_id: int, *, include_empty: bool = True):
 
 async def autocomplete_topics(interaction: discord.Interaction, current: str):
     try:
-        topics = get_topics_for_autocomplete(interaction.guild.id, include_empty=False) or []
+        guild_id = interaction.guild_id
+        if guild_id is None:
+            return []
+
+        topics = get_topics_for_autocomplete(guild_id, include_empty=False) or []
         return [
             app_commands.Choice(name=topic, value=topic)
             for topic in topics if current.lower() in topic.lower()
@@ -81,7 +85,11 @@ async def autocomplete_topics(interaction: discord.Interaction, current: str):
 
 async def autocomplete_quiz_topics(interaction: discord.Interaction, current: str):
     try:
-        topics = get_topics_for_autocomplete(interaction.guild.id, include_empty=False) or []
+        guild_id = interaction.guild_id
+        if guild_id is None:
+            return []
+
+        topics = get_topics_for_autocomplete(guild_id, include_empty=False) or []
         return [
             app_commands.Choice(name=topic, value=topic)
             for topic in topics if current.lower() in topic.lower()
@@ -94,7 +102,11 @@ async def autocomplete_quiz_topics(interaction: discord.Interaction, current: st
 
 async def autocomplete_all_topics(interaction: discord.Interaction, current: str):
     try:
-        topics = get_topics_for_autocomplete(interaction.guild.id, include_empty=True) or []
+        guild_id = interaction.guild_id
+        if guild_id is None:
+            return []
+
+        topics = get_topics_for_autocomplete(guild_id, include_empty=True) or []
         return [
             app_commands.Choice(name=topic, value=topic)
             for topic in topics if current.lower() in topic.lower()
