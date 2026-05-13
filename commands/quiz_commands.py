@@ -1,6 +1,7 @@
 import logging
 import random
 import re
+import json
 from discord import app_commands, Interaction, ButtonStyle
 import discord
 from discord.ui import View, Button
@@ -79,6 +80,63 @@ def _extract_true_false_answer(data: dict) -> str | None:
             return normalized
     return None
 
+def _normalize_alternatives(raw_alternatives) -> dict[str, str]:
+    if isinstance(raw_alternatives, dict):
+        normalized = {
+            str(letter).strip().upper(): str(text).strip()
+            for letter, text in raw_alternatives.items()
+            if str(letter).strip() and str(text).strip()
+        }
+        return dict(sorted(normalized.items(), key=lambda item: item[0]))
+
+    if isinstance(raw_alternatives, list):
+        normalized: dict[str, str] = {}
+        for index, text in enumerate(raw_alternatives):
+            label = chr(ord("A") + index)
+            value = str(text).strip()
+            if value:
+                normalized[label] = value
+        return normalized
+
+    if isinstance(raw_alternatives, str):
+        value = raw_alternatives.strip()
+        if not value:
+            return {}
+
+        # Try parsing serialized alternatives (JSON object/list).
+        try:
+            parsed = json.loads(value)
+            return _normalize_alternatives(parsed)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            pass
+
+        normalized = {}
+        for line in value.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            match = re.match(r"^([A-Za-z])[\)\.:\-\s]+(.+)$", line)
+            if match:
+                normalized[match.group(1).upper()] = match.group(2).strip()
+        if normalized:
+            return dict(sorted(normalized.items(), key=lambda item: item[0]))
+
+    return {}
+
+
+def _normalize_multiple_choice_answer(value: str) -> str | None:
+    if value is None:
+        return None
+
+    normalized = str(value).strip().upper()
+    if not normalized:
+        return None
+
+    match = re.search(r"[A-Z]", normalized)
+    if not match:
+        return None
+    return match.group(0)
+
 
 def register(tree: app_commands.CommandTree):
 
@@ -111,8 +169,54 @@ def register(tree: app_commands.CommandTree):
                                operation="no_questions_found")
                 return
 
+            eligible_questions = []
+            for question_doc in questions_data:
+                question_type = (question_doc.to_dict() or {}).get("question_type")
+                if question_type in (
+                    QuestionType.MULTIPLE_CHOICE.value,
+                    QuestionType.TRUE_FALSE.value,
+                    None,
+                    "",
+                ):
+                    eligible_questions.append(question_doc)
+
+            if not eligible_questions:
+                await interaction.followup.send(
+                    (
+                        f"❌ Topic `{topic_name}` has no compatible questions for `/quiz`. "
+                        "Use Multiple Choice or True/False questions."
+                    ),
+                    ephemeral=True,
+                )
+                return
+
+            valid_questions = []
+            for q in eligible_questions:
+                data = q.to_dict() or {}
+                q_type = data.get("question_type", QuestionType.TRUE_FALSE.value)
+
+                if q_type == QuestionType.MULTIPLE_CHOICE.value:
+                    alternatives = _normalize_alternatives(data.get("alternatives", {}))
+                    correct = _normalize_multiple_choice_answer(data.get("correct_answer", ""))
+                    if alternatives and correct and correct in alternatives:
+                        valid_questions.append(q)
+                else:
+                    correct = _extract_true_false_answer(data)
+                    if correct:
+                        valid_questions.append(q)
+
+            if len(valid_questions) < 5:
+                await interaction.followup.send(
+                    (
+                        f"❌ Topic `{topic_name}` has only {len(valid_questions)} valid questions for `/quiz`. "
+                        "You need at least 5 valid Multiple Choice/True-False questions."
+                    ),
+                    ephemeral=True,
+                )
+                return
+
             questions = random.sample(
-                questions_data, min(5, len(questions_data)))
+                valid_questions, 5)
 
             await interaction.followup.send("📋 Starting the quiz...", ephemeral=True)
 
@@ -125,16 +229,43 @@ def register(tree: app_commands.CommandTree):
                 text = f"**{idx + 1}. {data.get('question', '')}**"
 
                 alternatives = (
-                    data.get('alternatives', {})
+                    _normalize_alternatives(data.get('alternatives', {}))
                     if q_type == QuestionType.MULTIPLE_CHOICE.value
                     else {'T': 'True', 'F': 'False'}
                 )
+
+                if q_type == QuestionType.MULTIPLE_CHOICE.value and not alternatives:
+                    logger.warning(
+                        "Skipping malformed Multiple Choice question due to invalid alternatives.",
+                        command="quiz",
+                        user_id=str(interaction.user.id),
+                        username=interaction.user.display_name,
+                        guild_id=str(interaction.guild.id) if interaction.guild else None,
+                        topic=topic_name,
+                        question_id=question_id,
+                        raw_alternatives=str(data.get("alternatives")),
+                        operation="invalid_multiple_choice_alternatives"
+                    )
+                    continue
 
                 for letter, alt_text in alternatives.items():
                     text += f"\n{letter}. {alt_text}"
 
                 if q_type == QuestionType.MULTIPLE_CHOICE.value:
-                    correct = str(data.get('correct_answer', '')).strip().upper()
+                    correct = _normalize_multiple_choice_answer(data.get('correct_answer', ''))
+                    if not correct or correct not in alternatives:
+                        logger.warning(
+                            "Skipping malformed Multiple Choice question due to invalid correct answer.",
+                            command="quiz",
+                            user_id=str(interaction.user.id),
+                            username=interaction.user.display_name,
+                            guild_id=str(interaction.guild.id) if interaction.guild else None,
+                            topic=topic_name,
+                            question_id=question_id,
+                            raw_answer=str(data.get("correct_answer")),
+                            operation="invalid_multiple_choice_answer"
+                        )
+                        continue
                 else:
                     correct = _extract_true_false_answer(data)
                     if not correct:
@@ -241,8 +372,9 @@ def register(tree: app_commands.CommandTree):
 
         except Exception as e:
             try:
-                await interaction.followup.send("❌ An error occurred during the quiz.", ephemeral=True)
+                if interaction.response.is_done():
+                    await interaction.followup.send("❌ An error occurred during the quiz.", ephemeral=True)
+                else:
+                    await interaction.response.send_message("❌ An error occurred during the quiz.", ephemeral=True)
             except Exception:
                 pass
-            logging.error(f"Error during quiz: {e}")
-            await interaction.response.send_message("❌ An error occurred during the quiz.", ephemeral=True)

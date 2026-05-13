@@ -44,10 +44,13 @@ def create_topic_with_questions(guild_id, topic_title, topic_id, new_questions, 
             answer_value = question.get("answer")
             if answer_value in (None, ""):
                 answer_value = question.get("correct_answer")
+            alternatives_value = question.get("alternatives")
+            if alternatives_value in (None, "", {}):
+                alternatives_value = question.get("options")
             batch.set(doc_ref, {
                 "question_id": question_id,
                 "question": question.get("question"),
-                "alternatives": question.get("alternatives", ""),
+                "alternatives":  alternatives_value if alternatives_value is not None else "",
                 "correct_answer": answer_value,
                 "question_type": qtype.value,
                 "success": 0,
