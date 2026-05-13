@@ -80,6 +80,55 @@ def _extract_true_false_answer(data: dict) -> str | None:
     return None
 
 
+def _normalize_multiple_choice_alternatives(raw):
+    if isinstance(raw, dict):
+        out = {}
+        for k, v in raw.items():
+            key = str(k).strip().upper()
+            if key in {"A", "B", "C", "D"}:
+                out[key] = str(v).strip()
+        
+        # Forzar orden visual y de botones: A, B, C, D
+        return {k: out[k] for k in ("A", "B", "C", "D") if k in out}
+
+    if isinstance(raw, list):
+        letters = ["A", "B", "C", "D"]
+        out = {}
+        for i, v in enumerate(raw[:4]):
+            out[letters[i]] = str(v).strip()
+        return out
+
+    return None
+
+def _normalize_multiple_choice_answer(raw, alternatives: dict) -> str | None:
+    if raw is None:
+        return None
+
+    s = str(raw).strip()
+    if not s:
+        return None
+
+    upper = s.upper()
+
+    # Casos: "A", "b", "C)", "D."
+    m = re.match(r"^\s*([ABCD])\s*[\)\.\:\-]?\s*$", upper)
+    if m:
+        return m.group(1)
+
+    # Casos: "answer: B", "option C", "respuesta D"
+    m = re.search(r"\b(?:ANSWER|OPTION|RESPUESTA)?\s*[:\-]?\s*([ABCD])\b", upper)
+    if m:
+        return m.group(1)
+
+    # Si viene el texto completo de la opción
+    normalized_text = upper.strip()
+    for letter, option_text in alternatives.items():
+        if normalized_text == str(option_text).strip().upper():
+            return letter
+
+    return None
+
+
 def register(tree: app_commands.CommandTree):
 
     @tree.command(name="quiz", description="Take a quiz with 5 questions on a topic")
@@ -94,21 +143,15 @@ def register(tree: app_commands.CommandTree):
                 update_server_last_interaction(interaction.guild.id)
 
             questions_data = get_questions_by_topic(
-                interaction.guild.id, topic_name)
+                interaction.guild.id,
+                topic_name,
+            )
 
             if not questions_data:
                 await interaction.followup.send(
-                    f"❌ There are no questions registered for the topic `{topic_name}`.",
+                    f"❌ There are no True/False or Multiple Choice questions for {topic_name}. Use /short_answer_quiz for short-answer topics.",
                     ephemeral=True
                 )
-                logger.warning(f"❌ No questions found for topic: {topic_name}",
-                               command="quiz",
-                               user_id=str(interaction.user.id),
-                               username=interaction.user.display_name,
-                               guild_id=str(
-                                   interaction.guild.id) if interaction.guild else None,
-                               topic=topic_name,
-                               operation="no_questions_found")
                 return
 
             questions = random.sample(
@@ -124,18 +167,43 @@ def register(tree: app_commands.CommandTree):
                 q_type = data.get('question_type', 'True/False')
                 text = f"**{idx + 1}. {data.get('question', '')}**"
 
-                alternatives = (
-                    data.get('alternatives', {})
-                    if q_type == QuestionType.MULTIPLE_CHOICE.value
-                    else {'T': 'True', 'F': 'False'}
-                )
-
-                for letter, alt_text in alternatives.items():
-                    text += f"\n{letter}. {alt_text}"
-
                 if q_type == QuestionType.MULTIPLE_CHOICE.value:
-                    correct = str(data.get('correct_answer', '')).strip().upper()
+                    raw_alternatives = data.get("alternatives")
+                    if raw_alternatives in (None, "", {}):
+                        raw_alternatives = data.get("options")
+
+                    alternatives = _normalize_multiple_choice_alternatives(raw_alternatives)
+                    if not alternatives:
+                        logger.warning(
+                            "Skipping malformed Multiple Choice question due to invalid alternatives/options.",
+                            command="quiz",
+                            user_id=str(interaction.user.id),
+                            username=interaction.user.display_name,
+                            guild_id=str(interaction.guild.id) if interaction.guild else None,
+                            topic=topic_name,
+                            question_id=question_id,
+                            operation="invalid_multiple_choice_alternatives"
+                        )
+                        continue
+
+                    raw_correct = data.get("correct_answer", data.get("answer", ""))
+                    correct = _normalize_multiple_choice_answer(raw_correct, alternatives)
+                    if not correct or correct not in alternatives:
+                        logger.warning(
+                            "Skipping malformed Multiple Choice question due to invalid correct answer.",
+                            command="quiz",
+                            user_id=str(interaction.user.id),
+                            username=interaction.user.display_name,
+                            guild_id=str(interaction.guild.id) if interaction.guild else None,
+                            topic=topic_name,
+                            question_id=question_id,
+                            raw_answer=str(raw_correct),
+                            operation="invalid_multiple_choice_answer"
+                        )
+                        continue
+
                 else:
+                    alternatives = {"T": "True", "F": "False"}
                     correct = _extract_true_false_answer(data)
                     if not correct:
                         logger.warning(
@@ -151,34 +219,36 @@ def register(tree: app_commands.CommandTree):
                         )
                         continue
 
-                async def answer_callback(interaction_inner, choice, correct, question_id=question_id, q=q):
-                    if interaction.user.id != interaction_inner.user.id:
-                        await interaction_inner.response.send_message("This quiz isn't for you!", ephemeral=True)
-                        return False
+                topic_id = q.reference.parent.parent.id
 
-                    is_correct = choice.upper() == correct.upper()
-                    user_answers.append((choice.upper(), correct.upper()))
+                async def answer_callback(btn_interaction: discord.Interaction, selected: str, correct_answer: str):
+                    is_correct = (selected == correct_answer)
+                    user_answers.append((selected, correct_answer))
 
                     try:
                         update_question_stats(
-                            guild_id=interaction.guild.id,
-                            topic_id=q.reference.parent.parent.id,
-                            question_id=question_id,
-                            correct=is_correct
+                            btn_interaction.guild.id,
+                            topic_id,
+                            question_id,
+                            is_correct
                         )
-                    except Exception as err:
-                        logger.warning(f"Error updating stats for question {question_id}: {err}",
-                                       command="quiz",
-                                       user_id=str(interaction.user.id),
-                                       username=interaction.user.display_name,
-                                       guild_id=str(
-                                           interaction.guild.id) if interaction.guild else None,
-                                       question_id=question_id,
-                                       error_type=type(err).__name__,
-                                       operation="stats_update_error")
+                    except Exception as stats_error:
+                        logger.warning(
+                            f"Failed to update question stats: {stats_error}",
+                            command="quiz",
+                            user_id=str(btn_interaction.user.id),
+                            username=btn_interaction.user.display_name,
+                            guild_id=str(btn_interaction.guild.id) if btn_interaction.guild else None,
+                            topic=topic_name,
+                            topic_id=topic_id,
+                            question_id=question_id,
+                            operation="update_question_stats_failed"
+                        )
 
                     return is_correct
 
+                for letter, alt_text in alternatives.items():
+                    text += f"\n{letter}. {alt_text}"
                 view = QuizView(alternatives, correct, answer_callback)
                 await interaction.followup.send(text, view=view, ephemeral=True)
 
@@ -240,9 +310,8 @@ def register(tree: app_commands.CommandTree):
                 await interaction.followup.send(f"🔥 You're on a streak! ({streak} in a row)", ephemeral=True)
 
         except Exception as e:
+            logging.error(f"Error during quiz: {e}")
             try:
-                await interaction.followup.send("❌ An error occurred during the quiz.", ephemeral=True)
+             await interaction.followup.send("❌ An error occurred during the quiz.", ephemeral=True)
             except Exception:
                 pass
-            logging.error(f"Error during quiz: {e}")
-            await interaction.response.send_message("❌ An error occurred during the quiz.", ephemeral=True)

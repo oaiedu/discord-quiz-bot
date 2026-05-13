@@ -1,5 +1,5 @@
 import logging
-from firebase_init import db, bucket, SERVER_TIMESTAMP
+from firebase_init import Increment, db, bucket, SERVER_TIMESTAMP
 
 
 def list_topics(guild_id):
@@ -37,17 +37,40 @@ def create_topic_with_questions(guild_id, topic_title, topic_id, new_questions, 
                 str(guild_id)).collection("topics").document(str(topic_id))
             use_topic_id = topic_ref.id
 
+        def _normalize_alternatives(raw):
+            if isinstance(raw, dict):
+                out = {}
+                for k, v in raw.items():
+                    key = str(k).strip().upper()
+                    if key in {"A", "B", "C", "D"}:
+                        out[key] = str(v).strip()
+                return out
+            if isinstance(raw, list):
+                letters = ["A", "B", "C", "D"]
+                out = {}
+                for i, v in enumerate(raw[:4]):
+                    out[letters[i]] = str(v).strip()
+                return out
+            return {}
+
         batch = db.batch()
         for idx, question in enumerate(new_questions):
             doc_ref = topic_ref.collection("questions").document()
             question_id = doc_ref.id
+
             answer_value = question.get("answer")
             if answer_value in (None, ""):
                 answer_value = question.get("correct_answer")
+
+            raw_alternatives = question.get("alternatives")
+            if raw_alternatives in (None, "", {}):
+                raw_alternatives = question.get("options")
+            alternatives_value = _normalize_alternatives(raw_alternatives)
+
             batch.set(doc_ref, {
                 "question_id": question_id,
                 "question": question.get("question"),
-                "alternatives": question.get("alternatives", ""),
+                "alternatives": alternatives_value,
                 "correct_answer": answer_value,
                 "question_type": qtype.value,
                 "success": 0,
