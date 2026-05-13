@@ -1,5 +1,5 @@
 import logging
-from firebase_init import db, bucket, SERVER_TIMESTAMP
+from firebase_init import db, bucket, SERVER_TIMESTAMP, Increment
 
 
 def list_topics(guild_id):
@@ -53,6 +53,12 @@ def create_topic_with_questions(guild_id, topic_title, topic_id, new_questions, 
                 "success": 0,
                 "failures": 0
             })
+            
+        if topic_id is not None:
+            topic_ref.update({
+                "num_quizzes_generated": Increment(len(new_questions))
+            })
+
         batch.commit()
         logging.info(
             f"Topic '{topic_title}' with questions created/updated in server {guild_id} (ID: {use_topic_id})")
