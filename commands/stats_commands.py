@@ -11,6 +11,16 @@ from utils.utils import is_professor, professor_verification, safe_defer
 from utils.structured_logging import structured_logger as logger
 
 
+INVALID_USER_NAMES = {
+    "",
+    "no_name",
+    "no name",
+    "unknown",
+    "unknown user",
+    "none",
+    "null",
+}
+
 def register(tree: app_commands.CommandTree):
 
     @tree.command(name="stats", description="Shows a summary of the quizzes taken by all users (professors only)")
@@ -83,13 +93,33 @@ def register(tree: app_commands.CommandTree):
                 await interaction.followup.send("📂 No statistics recorded yet.", ephemeral=True)
                 return
 
-            names = []
-            attempts_by_user = {}
+            labels = []
+            passed_tests_by_user = {}
+            failed_tests_by_user = {}
+            label_counts = {}
 
             for uid, info in data.items():
-                name = info['name']
+                stored_name = str(info.get('name', '') or '').strip()
+                normalized_name = stored_name.lower()
+                display_name = stored_name
+
+                # Replace placeholder names with the current guild display name when possible.
+                if normalized_name in INVALID_USER_NAMES:
+                    member = interaction.guild.get_member(int(uid))
+                    if member is None:
+                        try:
+                            member = await interaction.guild.fetch_member(int(uid))
+                        except Exception:
+                            member = None
+
+                    if member is not None:
+                        display_name = member.display_name
+                    else:
+                        display_name = f"user_{uid}"
+
                 attempts = info['attempts']
-                scores = []
+                passed_tests = 0
+                failed_tests = 0
 
                 for attempt in attempts:
                     success = attempt.get("success", 0)
@@ -99,39 +129,51 @@ def register(tree: app_commands.CommandTree):
                     if total == 0:
                         continue
 
-                    avg = success / total
-                    scores.append(avg)
+                    if (success / total) >= 0.5:
+                        passed_tests += 1
+                    else:
+                        failed_tests += 1
 
-                if scores:
-                    names.append(name)
-                    attempts_by_user[name] = scores
+                if passed_tests > 0 or failed_tests > 0:
+                    label_counts[display_name] = label_counts.get(display_name, 0) + 1
 
-            user_count = len(names)
-            total_attempts = sum(len(scores)
-                                 for scores in attempts_by_user.values())
+                    if label_counts[display_name] > 1:
+                        label = f"{display_name} ({str(uid)[-4:]})"
+                    else:
+                        label = display_name
+
+                    labels.append(label)
+                    passed_tests_by_user[label] = passed_tests
+                    failed_tests_by_user[label] = failed_tests
+
+            user_count = len(labels)
+            total_attempts = sum(passed_tests_by_user.values()) + sum(failed_tests_by_user.values())
 
             fig, ax = plt.subplots(figsize=(12, 6))
-            bottom_map = {name: 0 for name in names}
+            x_positions = list(range(len(labels)))
+            width = 0.4
+            passed_values = [passed_tests_by_user[label] for label in labels]
+            failed_values = [failed_tests_by_user[label] for label in labels]
 
-            for name in names:
-                scores = attempts_by_user[name]
-                for avg in scores:
-                    color = 'green' if avg >= 0.5 else 'red'
-                    ax.bar(name, 1, bottom=bottom_map[name], color=color)
-                    bottom_map[name] += 1
+            success_positions = [x - width / 2 for x in x_positions]
+            failure_positions = [x + width / 2 for x in x_positions]
 
-            max_attempts = max(bottom_map.values(), default=0)
-            upper_limit = ((max_attempts + 4) // 5 + 1) * 5
+            ax.bar(success_positions, passed_values, width=width, color='green', label='Passed tests')
+            ax.bar(failure_positions, failed_values, width=width, color='red', label='Failed tests')
+
+            max_value = max(passed_values + failed_values, default=0)
+            upper_limit = ((max_value + 4) // 5 + 1) * 5
 
             ax.set_title('Quiz attempts per user')
             ax.set_ylabel('Number of attempts')
             ax.set_yticks(range(0, upper_limit + 1, 5))
             ax.set_xlabel('Users')
-            plt.xticks(rotation=45, ha='right')
+            ax.set_xticks(x_positions)
+            ax.set_xticklabels(labels, rotation=45, ha='right')
 
             # Legend
-            green_patch = mpatches.Patch(color='green', label='≥ 50% correct')
-            red_patch = mpatches.Patch(color='red', label='< 50% correct')
+            green_patch = mpatches.Patch(color='green', label='Passed tests')
+            red_patch = mpatches.Patch(color='red', label='Failed tests')
             ax.legend(handles=[green_patch, red_patch])
 
             buf = io.BytesIO()
@@ -141,7 +183,7 @@ def register(tree: app_commands.CommandTree):
             plt.close(fig)
 
             await interaction.followup.send(
-                content="📊 Quiz attempts per user (each bar segment = one attempt):",
+                content="📊 Quiz attempts per user (green = passed, red = failed):",
                 file=File(fp=buf, filename="user_stats_stacked.png"),
                 ephemeral=True
             )
