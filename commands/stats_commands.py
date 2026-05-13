@@ -66,89 +66,107 @@ def register(tree: app_commands.CommandTree):
             if not await professor_verification(interaction):
                 return
 
-            # Defer early, since we're doing heavy processing
             if not await safe_defer(interaction, thinking=True, ephemeral=True):
                 return
 
-            data = stats_repository.get_statistics_by_server(
-                interaction.guild.id)
+            data = stats_repository.get_statistics_by_server(interaction.guild.id)
 
             if not data:
-                logger.info("No statistics available for guild",
-                            command="user_stats",
-                            user_id=str(interaction.user.id),
-                            username=interaction.user.name,
-                            guild_id=str(interaction.guild.id),
-                            operation="no_stats_found")
+                logger.info(
+                    "No statistics available for guild",
+                    command="user_stats",
+                    user_id=str(interaction.user.id),
+                    username=interaction.user.name,
+                    guild_id=str(interaction.guild.id),
+                    operation="no_stats_found"
+                )
                 await interaction.followup.send("📂 No statistics recorded yet.", ephemeral=True)
                 return
 
-            names = []
-            attempts_by_user = {}
+            users = {}
 
             for uid, info in data.items():
-                name = info['name']
-                attempts = info['attempts']
+                display_name = str(info.get("name") or "").strip() or f"User-{uid[-4:]}"
+                attempts = info.get("attempts", [])
                 scores = []
 
                 for attempt in attempts:
-                    success = attempt.get("success", 0)
-                    failures = attempt.get("failures", 0)
+                    success = int(attempt.get("success", 0) or 0)
+                    failures = int(attempt.get("failures", 0) or 0)
                     total = success + failures
-
                     if total == 0:
                         continue
-
-                    avg = success / total
-                    scores.append(avg)
+                    scores.append(success / total)
 
                 if scores:
-                    names.append(name)
-                    attempts_by_user[name] = scores
+                    users[uid] = {
+                        "label": f"{display_name} ({uid[-4:]})",
+                        "scores": scores
+                    }
 
-            user_count = len(names)
-            total_attempts = sum(len(scores)
-                                 for scores in attempts_by_user.values())
+            if not users:
+                await interaction.followup.send("📂 No valid attempts to chart yet.", ephemeral=True)
+                return
+
+            uids = list(users.keys())
+
+            green_counts = []
+            red_counts = []
+
+            for uid in uids:
+                scores = users[uid]["scores"]
+                green_counts.append(sum(1 for avg in scores if avg >= 0.5))
+                red_counts.append(sum(1 for avg in scores if avg < 0.5))
 
             fig, ax = plt.subplots(figsize=(12, 6))
-            bottom_map = {name: 0 for name in names}
 
-            for name in names:
-                scores = attempts_by_user[name]
-                for avg in scores:
-                    color = 'green' if avg >= 0.5 else 'red'
-                    ax.bar(name, 1, bottom=bottom_map[name], color=color)
-                    bottom_map[name] += 1
+            x = list(range(len(uids)))
+            width = 0.42
 
-            max_attempts = max(bottom_map.values(), default=0)
-            upper_limit = ((max_attempts + 4) // 5 + 1) * 5
+            ax.bar(
+                [i - width / 2 for i in x],
+                green_counts,
+                width=width,
+                color="green",
+                label=">= 50% correct"
+            )
+            ax.bar(
+                [i + width / 2 for i in x],
+                red_counts,
+                width=width,
+                color="red",
+                label="< 50% correct"
+            )
 
-            ax.set_title('Quiz attempts per user')
-            ax.set_ylabel('Number of attempts')
+            max_attempts = max(green_counts + red_counts, default=0)
+            upper_limit = ((max_attempts + 4) // 5 + 1) * 5 if max_attempts > 0 else 5
+
+            ax.set_title("Quiz attempts per user")
+            ax.set_ylabel("Number of attempts")
+            ax.set_xlabel("Users")
             ax.set_yticks(range(0, upper_limit + 1, 5))
-            ax.set_xlabel('Users')
-            plt.xticks(rotation=45, ha='right')
-
-            # Legend
-            green_patch = mpatches.Patch(color='green', label='≥ 50% correct')
-            red_patch = mpatches.Patch(color='red', label='< 50% correct')
-            ax.legend(handles=[green_patch, red_patch])
+            ax.set_xticks(x)
+            ax.set_xticklabels(
+                [users[uid]["label"] for uid in uids],
+                rotation=45,
+                ha="right"
+            )
+            ax.legend()
 
             buf = io.BytesIO()
             plt.tight_layout()
-            plt.savefig(buf, format='png')
+            plt.savefig(buf, format="png")
             buf.seek(0)
             plt.close(fig)
 
             await interaction.followup.send(
-                content="📊 Quiz attempts per user (each bar segment = one attempt):",
-                file=File(fp=buf, filename="user_stats_stacked.png"),
+                content="📊 Quiz attempts per user (green vs red attempts):",
+                file=File(fp=buf, filename="user_stats_grouped.png"),
                 ephemeral=True
             )
 
         except Exception as e:
             logging.error(f"Error generating user_stats graph: {e}")
-
             try:
                 await interaction.followup.send("❌ Error retrieving statistics.", ephemeral=True)
             except Exception:
