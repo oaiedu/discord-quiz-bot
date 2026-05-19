@@ -8,7 +8,7 @@ import fitz
 from google.cloud import storage
 from repositories.topic_repository import create_topic_with_questions
 from utils.enum import QuestionType
-from utils.prompts import prompt_default, prompt_multiple_choice, prompt_short_answer, prompt_true_false
+from utils.prompts import prompt_default, prompt_multiple_choice, prompt_short_answer, prompt_true_false, prompt_explain_topic
 
 load_dotenv()
 
@@ -352,3 +352,32 @@ async def generate_questions_from_pdf(topic_name, topic_id, guild_id, pdf_url, q
     except Exception as e:
         print(f"⚠️ ERROR in generate_questions_from_pdf: {type(e).__name__}: {e}")
         return False
+
+async def generate_explanation_from_pdf(topic_name, pdf_url, max_lines=10):
+    """Extract text from a topic PDF and generate a short explanation with OpenRouter."""
+    try:
+        extracted_text = await extract_text_from_pdf_url(pdf_url)
+        if not extracted_text:
+            print(f"⚠️ FAILED: Could not extract text from PDF for topic '{topic_name}'")
+            return None
+
+        prompt_text = prompt_explain_topic(topic_name, extracted_text)
+
+        messages = [
+            {
+                "role": "user",
+                "content": prompt_text
+            }
+        ]
+
+        result = await send_to_openrouter(messages)
+
+        if result is None:
+            print(f"⚠️ FAILED: Could not generate explanation for topic '{topic_name}'")
+            return None
+
+        return result
+
+    except Exception as e:
+        print(f"⚠️ ERROR in generate_explanation_from_pdf: {type(e).__name__}: {e}")
+        return None
