@@ -82,3 +82,22 @@ Topic: {topic}
 Content:
 {text[:4000]}
 """
+
+
+def prompt_topic_explanation(topic, text):
+    return f"""
+You are an educational assistant.
+Based on the content below, write a brief explanation of the topic in a maximum of 5 lines.
+
+Rules:
+- Maximum 5 lines total.
+- Keep it concise and easy to understand.
+- Do not use bullet points or numbering.
+- Do not add titles or extra formatting.
+- If the source content is in Spanish, answer in Spanish. If it is in English, answer in English.
+
+Topic: {topic}
+
+Content:
+{text[:4000]}
+"""

@@ -5,10 +5,12 @@ import json
 import asyncio
 import aiohttp
 import fitz
+from urllib.parse import urlparse
+from firebase_init import bucket
 from google.cloud import storage
 from repositories.topic_repository import create_topic_with_questions
 from utils.enum import QuestionType
-from utils.prompts import prompt_default, prompt_multiple_choice, prompt_short_answer, prompt_true_false
+from utils.prompts import prompt_default, prompt_multiple_choice, prompt_short_answer, prompt_true_false, prompt_topic_explanation
 
 load_dotenv()
 
@@ -253,15 +255,29 @@ def _extract_text_from_pdf_bytes(pdf_bytes):
 
 
 async def extract_text_from_pdf_url(pdf_url):
-    timeout = aiohttp.ClientTimeout(total=60)
     try:
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(pdf_url) as response:
-                if response.status != 200:
-                    print(f"⚠️ Could not download PDF (HTTP {response.status})")
-                    return None
+        parsed = urlparse(pdf_url)
 
-                pdf_bytes = await response.read()
+        if parsed.scheme == "gs":
+            bucket_name = parsed.netloc
+            object_path = parsed.path.lstrip("/")
+
+            if not bucket_name or not object_path:
+                print("⚠️ Invalid gs:// URI for PDF")
+                return None
+
+            target_bucket = bucket if bucket_name == bucket.name else bucket.client.bucket(bucket_name)
+            target_blob = target_bucket.blob(object_path)
+            pdf_bytes = await asyncio.to_thread(target_blob.download_as_bytes)
+        else:
+            timeout = aiohttp.ClientTimeout(total=60)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(pdf_url) as response:
+                    if response.status != 200:
+                        print(f"⚠️ Could not download PDF (HTTP {response.status})")
+                        return None
+
+                    pdf_bytes = await response.read()
 
         text = await asyncio.to_thread(_extract_text_from_pdf_bytes, pdf_bytes)
         if not text:
@@ -352,3 +368,34 @@ async def generate_questions_from_pdf(topic_name, topic_id, guild_id, pdf_url, q
     except Exception as e:
         print(f"⚠️ ERROR in generate_questions_from_pdf: {type(e).__name__}: {e}")
         return False
+
+
+async def generate_topic_explanation_from_pdf(topic_name, pdf_url):
+    """Extract topic PDF text and generate a short explanation (max 5 lines)."""
+    try:
+        extracted_text = await extract_text_from_pdf_url(pdf_url)
+        if not extracted_text:
+            print(f"⚠️ FAILED: Could not extract text from PDF for topic '{topic_name}'")
+            return None
+
+        prompt_text = prompt_topic_explanation(topic_name, extracted_text)
+        messages = [
+            {
+                "role": "user",
+                "content": prompt_text
+            }
+        ]
+
+        result = await send_to_openrouter(messages)
+        if result is None:
+            print(f"⚠️ FAILED: Could not generate explanation for topic '{topic_name}'")
+            return None
+
+        # Enforce max 5 non-empty lines, even if model returns more.
+        lines = [line.strip() for line in result.splitlines() if line.strip()]
+        trimmed = "\n".join(lines[:5]).strip()
+        return trimmed or None
+
+    except Exception as e:
+        print(f"⚠️ ERROR in generate_topic_explanation_from_pdf: {type(e).__name__}: {e}")
+        return None

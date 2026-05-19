@@ -4,11 +4,11 @@ import logging
 import os
 import json
 
-from repositories.topic_repository import create_topic_without_questions, create_topic_with_questions, get_topics_by_server, save_topic_pdf
+from repositories.topic_repository import create_topic_without_questions, create_topic_with_questions, get_topics_by_server, save_topic_pdf, get_topic_by_name
 from utils.structured_logging import structured_logger as logger
 from utils.enum import QuestionType
-from utils.utils import professor_verification, update_last_interaction, is_professor, safe_defer, autocomplete_question_type
-from utils.llm_utils import generate_questions_from_pdf
+from utils.utils import professor_verification, update_last_interaction, is_professor, safe_defer, autocomplete_question_type, autocomplete_all_topics
+from utils.llm_utils import generate_questions_from_pdf, generate_topic_explanation_from_pdf
 
 DOCS_PATH = "docs"
 
@@ -323,5 +323,53 @@ def register(tree: app_commands.CommandTree):
             interaction.extras["command_failed"] = True
             try:
                 await interaction.followup.send(f"❌ Error uploading JSON questions: {e}", ephemeral=True)
+            except Exception:
+                pass
+
+    @tree.command(name="explain_topic", description="Generate a short AI summary (max 5 lines) for a topic")
+    @app_commands.describe(topic="Topic name")
+    @app_commands.autocomplete(topic=autocomplete_all_topics)
+    async def explain_topic_command(interaction: discord.Interaction, topic: str):
+        if not await safe_defer(interaction, thinking=True, ephemeral=True):
+            return
+
+        try:
+            try:
+                update_last_interaction(interaction.guild.id)
+            except Exception as e:
+                logging.warning(f"Failed to update interaction: {e}")
+
+            topic_data = get_topic_by_name(interaction.guild.id, topic)
+            if not topic_data:
+                await interaction.followup.send(f"📭 Topic `{topic}` not found.", ephemeral=True)
+                return
+
+            document_url = topic_data.get("document_storage_url")
+            if not document_url:
+                await interaction.followup.send(
+                    f"📄 Topic `{topic}` does not have a PDF linked, so I cannot generate the explanation.",
+                    ephemeral=True,
+                )
+                return
+
+            explanation = await generate_topic_explanation_from_pdf(topic, document_url)
+            if not explanation:
+                interaction.extras["command_failed"] = True
+                await interaction.followup.send(
+                    "⚠️ I could not generate the topic explanation right now (OpenRouter failed or rate-limited).",
+                    ephemeral=True,
+                )
+                return
+
+            await interaction.followup.send(
+                f"🧠 Brief explanation for `{topic}`:\n{explanation}",
+                ephemeral=True,
+            )
+
+        except Exception as e:
+            interaction.extras["command_failed"] = True
+            logging.error(f"Error in /explain_topic: {e}")
+            try:
+                await interaction.followup.send(f"❌ Error generating topic explanation: {e}", ephemeral=True)
             except Exception:
                 pass
