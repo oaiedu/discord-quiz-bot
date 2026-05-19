@@ -3,11 +3,13 @@ import discord
 import logging
 import os
 import json
+import aiohttp
+import io
 
-from repositories.topic_repository import create_topic_without_questions, create_topic_with_questions, get_topics_by_server, save_topic_pdf
+from repositories.topic_repository import create_topic_without_questions, create_topic_with_questions, get_topics_by_server, save_topic_pdf, get_topic_by_name
 from utils.structured_logging import structured_logger as logger
 from utils.enum import QuestionType
-from utils.utils import professor_verification, update_last_interaction, is_professor, safe_defer, autocomplete_question_type
+from utils.utils import professor_verification, update_last_interaction, is_professor, safe_defer, autocomplete_question_type, autocomplete_all_topics
 from utils.llm_utils import generate_questions_from_pdf
 
 DOCS_PATH = "docs"
@@ -323,5 +325,107 @@ def register(tree: app_commands.CommandTree):
             interaction.extras["command_failed"] = True
             try:
                 await interaction.followup.send(f"❌ Error uploading JSON questions: {e}", ephemeral=True)
+            except Exception:
+                pass
+
+    ###
+    # DOWNLOAD PDF FOR A TOPIC
+    ###
+    @tree.command(name="download_pdf", description="Download the PDF for a topic")
+    @app_commands.describe(topic_name="Topic name")
+    @app_commands.autocomplete(topic_name=autocomplete_all_topics)
+    async def download_pdf_command(interaction: discord.Interaction, topic_name: str):
+        if not await safe_defer(interaction, thinking=True, ephemeral=True):
+            return
+
+        try:
+            try:
+                update_last_interaction(interaction.guild.id)
+            except Exception as e:
+                logging.warning(f"Failed to update interaction: {e}")
+
+            if not interaction.guild:
+                await interaction.followup.send(
+                    "❌ This command can only be used inside a server.",
+                    ephemeral=True
+                )
+                return
+
+            topic_data = get_topic_by_name(interaction.guild.id, topic_name)
+            if not topic_data:
+                await interaction.followup.send(
+                    f"❌ Topic '{topic_name}' not found.",
+                    ephemeral=True
+                )
+                return
+
+            pdf_url = topic_data.get("document_storage_url")
+            if not pdf_url:
+                await interaction.followup.send(
+                    f"❌ Topic '{topic_name}' does not have a PDF associated yet.",
+                    ephemeral=True
+                )
+                return
+
+            topic_title = topic_data.get("title", topic_name)
+            safe_topic = "".join(
+                ch if ch.isalnum() or ch in ("-", "_") else ""
+                for ch in topic_title
+            ).strip("_")
+
+            if not safe_topic:
+                safe_topic = "topic"
+
+            filename = f"{safe_topic}.pdf"
+
+            size_limit = interaction.guild.filesize_limit or (8 * 1024 * 1024)
+            timeout = aiohttp.ClientTimeout(total=30)
+
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(pdf_url) as response:
+                    if response.status != 200:
+                        await interaction.followup.send(
+                            "❌ Could not download the PDF from storage.",
+                            ephemeral=True
+                        )
+                        return
+
+                    content_length = response.headers.get("Content-Length")
+                    if content_length:
+                        try:
+                            if int(content_length) > size_limit:
+                                await interaction.followup.send(
+                                    f"⚠️ The PDF is too large for Discord upload. Use this link:\n{pdf_url}",
+                                    ephemeral=True
+                                )
+                                return
+                        except ValueError:
+                            pass
+
+                    pdf_bytes = await response.read()
+
+                    if len(pdf_bytes) > size_limit:
+                        await interaction.followup.send(
+                            f"⚠️ The PDF is too large for Discord upload. Use this link:\n{pdf_url}",
+                            ephemeral=True
+                        )
+                        return
+
+                    pdf_file = discord.File(io.BytesIO(pdf_bytes), filename=filename)
+
+                    await interaction.followup.send(
+                        content=f"📄 PDF for topic '{topic_title}':",
+                        file=pdf_file,
+                        ephemeral=True
+                    )
+
+        except Exception as e:
+            logging.error(f"Error in /download_pdf for topic '{topic_name}': {e}")
+            interaction.extras["command_failed"] = True
+            try:
+                await interaction.followup.send(
+                    "❌ Error downloading the PDF.",
+                    ephemeral=True
+                )
             except Exception:
                 pass
