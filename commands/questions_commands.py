@@ -7,6 +7,8 @@ from utils.enum import QuestionType
 from utils.llm_utils import generate_questions_from_pdf
 from utils.structured_logging import structured_logger as logger
 from utils.utils import professor_verification, update_last_interaction, autocomplete_question_type, is_professor, autocomplete_topics, autocomplete_all_topics, autocomplete_TF, safe_defer
+from views.delete_question_view import DeleteQuestionView
+
 
 # Register commands
 
@@ -106,11 +108,11 @@ def register(tree: app_commands.CommandTree):
             except Exception:
                 pass
 
-    @tree.command(name="delete_question", description="Delete a question by ID (Professors only)")
+    @tree.command(name="delete_question", description="Delete a question interactively (Professors only)")
     @app_commands.default_permissions(administrator=True)
-    @app_commands.describe(topic="Topic name", id="Question ID (string)")
+    @app_commands.describe(topic="Topic name")
     @app_commands.autocomplete(topic=autocomplete_topics)
-    async def delete_question_command(interaction: Interaction, topic: str, id: str):
+    async def delete_question_command(interaction: Interaction, topic: str):
         if not await professor_verification(interaction):
             return
         if not await safe_defer(interaction, thinking=True, ephemeral=True):
@@ -119,8 +121,41 @@ def register(tree: app_commands.CommandTree):
         try:
             update_last_interaction(interaction.guild.id)
 
-            delete_question(interaction.guild.id, topic, id)
-            await interaction.followup.send(f"🗑️ Deleted question with ID `{id}` from `{topic}`", ephemeral=True)
+            questions = list_questions_by_topic(interaction.guild.id, topic)
+
+            if not questions:
+                await interaction.followup.send(
+                    f"📭 No questions found for `{topic}`.",
+                    ephemeral=True,
+                )
+                return
+
+            blocks = []
+            current_block = (
+                f"📚 Questions for `{topic}`:\n"
+                "Click the button below to open a modal and type the number to delete.\n\n"
+            )
+
+            for i, q in enumerate(questions, start=1):
+                line = f"{i}. {q['question']} (Answer: {q['correct_answer']})\n"
+                if len(current_block) + len(line) > 2000:
+                    blocks.append(current_block)
+                    current_block = ""
+                current_block += line
+
+            if current_block:
+                blocks.append(current_block)
+
+            delete_view = DeleteQuestionView(
+                guild_id=interaction.guild.id,
+                topic=topic,
+                questions=questions,
+                owner_user_id=interaction.user.id,
+            )
+
+            await interaction.followup.send(blocks[0], ephemeral=True, view=delete_view)
+            for block in blocks[1:]:
+                await interaction.followup.send(block, ephemeral=True)
 
         except Exception as e:
             try:
