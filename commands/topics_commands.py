@@ -4,11 +4,12 @@ import logging
 import os
 import json
 
-from repositories.topic_repository import create_topic_without_questions, create_topic_with_questions, get_topics_by_server, save_topic_pdf
+from repositories.topic_repository import create_topic_without_questions, create_topic_with_questions, get_topics_by_server, save_topic_pdf, get_topic_by_name, download_topic_pdf_bytes
 from utils.structured_logging import structured_logger as logger
 from utils.enum import QuestionType
-from utils.utils import professor_verification, update_last_interaction, is_professor, safe_defer, autocomplete_question_type
+from utils.utils import professor_verification, update_last_interaction, is_professor, safe_defer, autocomplete_question_type, autocomplete_all_topics
 from utils.llm_utils import generate_questions_from_pdf
+from io import BytesIO
 
 DOCS_PATH = "docs"
 
@@ -323,5 +324,60 @@ def register(tree: app_commands.CommandTree):
             interaction.extras["command_failed"] = True
             try:
                 await interaction.followup.send(f"❌ Error uploading JSON questions: {e}", ephemeral=True)
+            except Exception:
+                pass
+
+    @tree.command(name="download_pdf", description="Download the PDF associated with a specific topic")
+    @app_commands.describe(topic="Topic name")
+    @app_commands.autocomplete(topic=autocomplete_all_topics)
+    async def download_pdf_command(interaction: discord.Interaction, topic: str):
+        if not await safe_defer(interaction, thinking=True, ephemeral=True):
+            return
+
+        try:
+            try:
+                update_last_interaction(interaction.guild.id)
+            except Exception as e:
+                logging.warning(f"Failed to update interaction: {e}")
+
+            topic_data = get_topic_by_name(interaction.guild.id, topic)
+            if not topic_data:
+                await interaction.followup.send(f"📭 Topic `{topic}` not found.", ephemeral=True)
+                return
+
+            document_url = topic_data.get("document_storage_url")
+            if not document_url:
+                await interaction.followup.send(f"📄 Topic `{topic}` does not have a PDF linked.", ephemeral=True)
+                return
+
+            pdf_bytes = download_topic_pdf_bytes(document_url)
+            if not pdf_bytes:
+                interaction.extras["command_failed"] = True
+                await interaction.followup.send(
+                    "❌ Could not download the PDF from storage. Try again later.",
+                    ephemeral=True,
+                )
+                return
+
+            safe_filename = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in topic.strip())
+            if not safe_filename:
+                safe_filename = "topic"
+
+            discord_file = discord.File(
+                fp=BytesIO(pdf_bytes),
+                filename=f"{safe_filename}.pdf",
+            )
+
+            await interaction.followup.send(
+                content=f"📎 PDF for topic `{topic}`:",
+                file=discord_file,
+                ephemeral=True,
+            )
+
+        except Exception as e:
+            interaction.extras["command_failed"] = True
+            logging.error(f"Error in /download_pdf: {e}")
+            try:
+                await interaction.followup.send(f"❌ Error downloading PDF: {e}", ephemeral=True)
             except Exception:
                 pass

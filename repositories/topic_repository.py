@@ -1,5 +1,7 @@
 import logging
 from firebase_init import db, bucket, SERVER_TIMESTAMP
+from urllib.parse import urlparse
+from urllib.request import urlopen
 
 
 def list_topics(guild_id):
@@ -162,4 +164,40 @@ def save_topic_pdf(pdf_path, guild_id):
         return document_url
     except Exception as e:
         logging.error(f"Error saving topic PDF for server {guild_id}: {e}")
+        return None
+
+
+def download_topic_pdf_bytes(document_url: str):
+    try:
+        if not document_url:
+            logging.error("Error downloading topic PDF: empty document URL")
+            return None
+
+        parsed = urlparse(document_url)
+
+        if parsed.scheme == "gs":
+            bucket_name = parsed.netloc
+            object_path = parsed.path.lstrip("/")
+
+            if not bucket_name or not object_path:
+                logging.error("Error downloading topic PDF: invalid gs:// URL")
+                return None
+
+            target_bucket = bucket if bucket_name == bucket.name else bucket.client.bucket(bucket_name)
+            target_blob = target_bucket.blob(object_path)
+            return target_blob.download_as_bytes()
+
+        if parsed.scheme in ("http", "https"):
+            with urlopen(document_url, timeout=60) as response:
+                status_code = getattr(response, "status", None)
+                if status_code and status_code != 200:
+                    logging.error(f"Error downloading topic PDF: HTTP {status_code}")
+                    return None
+                return response.read()
+
+        logging.error(f"Error downloading topic PDF: unsupported URL scheme '{parsed.scheme}'")
+        return None
+
+    except Exception as e:
+        logging.error(f"Error downloading topic PDF from '{document_url}': {e}")
         return None
