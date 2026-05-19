@@ -82,3 +82,23 @@ Topic: {topic}
 Content:
 {text[:4000]}
 """
+
+def prompt_explain_topic(topic, text):
+    return f"""You are an academic teaching assistant.
+Write a concise explanation in English about the topic below, using only the provided source content.
+
+Requirements:
+
+Maximum 10 lines total.
+Keep each line short and clear.
+Focus on the most important concepts.
+Use simple language suitable for students.
+Do not invent facts that are not in the source.
+Do not output JSON.
+Do not use markdown headings.
+Return plain text only.
+Topic: {topic}
+
+Source content:
+{text[:4000]}
+"""

@@ -21,7 +21,7 @@ load_dotenv()
 
 from utils.keep_alive import keep_alive
 from utils.structured_logging import structured_logger as logger
-from commands import questions_commands, quiz_commands, stats_commands, topics_commands, level_commands
+from commands import questions_commands, quiz_commands, stats_commands, topics_commands, level_commands, explain_commands
 from repositories.server_repository import register_server, deactivate_server, update_server_last_interaction, update_server_metadata
 from repositories.user_repository import register_single_user, register_guild_users
 from utils.utils import is_professor, log_command_event, interaction_has_admin_permission
@@ -110,6 +110,7 @@ topics_commands.register(bot.tree)
 quiz_commands.register(bot.tree)
 stats_commands.register(bot.tree)
 level_commands.register(bot.tree)
+explain_commands.register(bot.tree)
 
 
 @bot.event
