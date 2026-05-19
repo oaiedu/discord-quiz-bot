@@ -7,11 +7,32 @@ from utils.enum import QuestionType
 from utils.llm_utils import generate_questions_from_pdf
 from utils.structured_logging import structured_logger as logger
 from utils.utils import professor_verification, update_last_interaction, autocomplete_question_type, is_professor, autocomplete_topics, autocomplete_all_topics, autocomplete_TF, safe_defer
+from views.delete_question_view import DeleteQuestionView
 
 # Register commands
 
 
 def register(tree: app_commands.CommandTree):
+
+    def _build_question_blocks(topic: str, questions: list):
+        blocks = []
+        current_block = f"📚 Questions for '{topic}':\n"
+
+        for i, q in enumerate(questions, start=1):
+            question_text = q.get("question", "No question text")
+            answer_text = q.get("correct_answer", "N/A")
+            line = f"{i}. {question_text} (Answer: {answer_text})\n"
+
+            if len(current_block) + len(line) > 2000:
+                blocks.append(current_block)
+                current_block = ""
+
+            current_block += line
+
+        if current_block:
+            blocks.append(current_block)
+
+        return blocks
 
     @tree.command(name="add_question", description="Add a question to a topic (Professors only)")
     @app_commands.default_permissions(administrator=True)
@@ -106,11 +127,11 @@ def register(tree: app_commands.CommandTree):
             except Exception:
                 pass
 
-    @tree.command(name="delete_question", description="Delete a question by ID (Professors only)")
+    @tree.command(name="delete_question", description="Delete a question by number (Professors only)")
     @app_commands.default_permissions(administrator=True)
-    @app_commands.describe(topic="Topic name", id="Question ID (string)")
+    @app_commands.describe(topic="Topic name")
     @app_commands.autocomplete(topic=autocomplete_topics)
-    async def delete_question_command(interaction: Interaction, topic: str, id: str):
+    async def delete_question_command(interaction: Interaction, topic: str):
         if not await professor_verification(interaction):
             return
         if not await safe_defer(interaction, thinking=True, ephemeral=True):
@@ -119,8 +140,30 @@ def register(tree: app_commands.CommandTree):
         try:
             update_last_interaction(interaction.guild.id)
 
-            delete_question(interaction.guild.id, topic, id)
-            await interaction.followup.send(f"🗑️ Deleted question with ID `{id}` from `{topic}`", ephemeral=True)
+            questions = list_questions_by_topic(interaction.guild.id, topic)
+
+            if not questions:
+                await interaction.followup.send(f"📭 No questions found for '{topic}'.", ephemeral=True)
+                return
+
+            blocks = _build_question_blocks(topic, questions)
+            await interaction.followup.send(blocks[0], ephemeral=True)
+            for block in blocks[1:]:
+                await interaction.followup.send(block, ephemeral=True)
+
+            view = DeleteQuestionView(
+                requester_id=interaction.user.id,
+                guild_id=interaction.guild.id,
+                topic=topic,
+                questions=questions
+            )
+            button_message = await interaction.followup.send(
+                "🧩 Click the button to enter the number.",
+                view=view,
+                ephemeral=True,
+                wait=True
+            )
+            view.message = button_message
 
         except Exception as e:
             try:
