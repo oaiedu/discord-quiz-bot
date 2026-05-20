@@ -82,3 +82,22 @@ Topic: {topic}
 Content:
 {text[:4000]}
 """
+
+def prompt_grade_short_answers(topic, answers_payload_json):
+        return f"""You are an exam grader. Evaluate student short answers against expected answers.
+Score each question from 0 to 2, then produce a final score from 0 to 10.
+Be strict but fair, allowing paraphrases and equivalent meaning.
+
+Return ONLY valid JSON with this exact schema:
+{{
+    "score": 0-10 number,
+    "summary": "short overall feedback",
+    "per_question": [
+        {{"question_index": 1, "score": 0-2 number, "is_correct": true/false, "comment": "short feedback"}}
+    ]
+}}
+
+Topic: {topic}
+Data:
+{answers_payload_json}
+"""
