@@ -8,7 +8,7 @@ import fitz
 from google.cloud import storage
 from repositories.topic_repository import create_topic_with_questions
 from utils.enum import QuestionType
-from utils.prompts import prompt_default, prompt_multiple_choice, prompt_short_answer, prompt_true_false
+from utils.prompts import prompt_default, prompt_multiple_choice, prompt_short_answer, prompt_true_false, prompt_short_answer_grader
 
 load_dotenv()
 
@@ -329,6 +329,7 @@ async def generate_questions_from_pdf(topic_name, topic_id, guild_id, pdf_url, q
         switch = {
             QuestionType.MULTIPLE_CHOICE: prompt_multiple_choice,
             QuestionType.TRUE_FALSE: prompt_true_false,
+            QuestionType.SHORT_ANSWER: prompt_short_answer
         }
         prompt_fn = switch.get(qtype, prompt_default)
         prompt_text = prompt_fn(topic_name, extracted_text, qty)
@@ -352,3 +353,42 @@ async def generate_questions_from_pdf(topic_name, topic_id, guild_id, pdf_url, q
     except Exception as e:
         print(f"⚠️ ERROR in generate_questions_from_pdf: {type(e).__name__}: {e}")
         return False
+
+
+async def evaluate_short_answer_semantic(expected_answer: str, user_answer: str) -> tuple[bool, str]:
+    expected = str(expected_answer or "").strip()
+    received = str(user_answer or "").strip()
+
+    if not expected or not received:
+        return False, "Missing expected answer or user answer."
+
+    # Fast fallback before using LLM
+    if _normalize_for_exact_match(expected) == _normalize_for_exact_match(received):
+        return True, "Exact normalized match."
+
+    prompt_text = prompt_short_answer_grader(expected, received)
+    raw = await send_to_openrouter([{"role": "user", "content": prompt_text}])
+
+    if not raw:
+        return False, "LLM unavailable. Exact fallback did not match."
+
+    parsed = _parse_questions_json(raw)
+    if isinstance(parsed, dict):
+        verdict = parsed.get("is_correct")
+        reason = str(parsed.get("reason", "")).strip() or "Semantic comparison."
+
+        if isinstance(verdict, bool):
+            return verdict, reason
+
+        if isinstance(verdict, str):
+            v = verdict.strip().lower()
+            if v in {"true", "yes", "1"}:
+                return True, reason
+            if v in {"false", "no", "0"}:
+                return False, reason
+
+    return False, "Invalid LLM grader output. Exact fallback did not match."
+
+
+def _normalize_for_exact_match(value: str) -> str:
+    return " ".join(str(value).strip().lower().split())

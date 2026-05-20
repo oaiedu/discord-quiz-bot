@@ -82,3 +82,26 @@ Topic: {topic}
 Content:
 {text[:4000]}
 """
+
+def prompt_short_answer_grader(expected_answer, user_answer):
+    return f"""
+You are grading a student's short answer.
+
+Expected answer:
+{expected_answer}
+
+Student answer:
+{user_answer}
+
+Decide if the student answer has the same meaning as the expected answer.
+Be strict but fair:
+- Accept paraphrases with equivalent meaning.
+- Reject answers that change or omit key facts.
+- Reject vague answers that do not clearly match.
+
+Return ONLY valid JSON with this exact schema:
+{{
+  "is_correct": true,
+  "reason": "short reason"
+}}
+"""
