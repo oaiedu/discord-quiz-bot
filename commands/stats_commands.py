@@ -7,7 +7,8 @@ import discord
 
 from repositories import stats_repository, quiz_repository
 from repositories.server_repository import update_server_last_interaction
-from utils.utils import is_professor, professor_verification, safe_defer
+from utils.utils import is_professor, professor_verification, safe_defer, autocomplete_all_topics
+from repositories.topic_repository import get_questions_by_topic
 from utils.structured_logging import structured_logger as logger
 
 
@@ -213,5 +214,155 @@ def register(tree: app_commands.CommandTree):
 
             try:
                 await interaction.followup.send(f"❌ Error retrieving statistics. {e}", ephemeral=True)
+            except Exception:
+                logging.error("Failed to send error message to user")
+
+    
+    @tree.command(name="topic_stats", description="Shows detailed statistics for a topic (professors only)")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(topic="Topic name")
+    @app_commands.autocomplete(topic=autocomplete_all_topics)
+    async def topic_stats(interaction: discord.Interaction, topic: str):
+        try:
+            update_server_last_interaction(interaction.guild.id)
+
+            if not await professor_verification(interaction):
+                return
+
+            if not await safe_defer(interaction, thinking=True, ephemeral=True):
+                return
+
+            question_docs = get_questions_by_topic(interaction.guild.id, topic)
+
+            if not question_docs:
+                logger.info("No topic statistics available for topic",
+                            command="topic_stats",
+                            user_id=str(interaction.user.id),
+                            username=interaction.user.name,
+                            guild_id=str(interaction.guild.id),
+                            topic=topic,
+                            operation="no_topic_stats_found")
+                await interaction.followup.send(
+                    f"📂 No question statistics were found for topic '{topic}'.",
+                    ephemeral=True,
+                )
+                return
+
+            question_stats = []
+            total_success = 0
+            total_failures = 0
+
+            for doc in question_docs:
+                data = doc.to_dict() or {}
+                question_text = data.get("question", "Untitled question")
+                success = int(data.get("success", 0) or 0)
+                failures = int(data.get("failures", 0) or 0)
+
+                total_success += success
+                total_failures += failures
+
+                question_stats.append({
+                    "question": question_text,
+                    "success": success,
+                    "failures": failures,
+                })
+
+            total_answers = total_success + total_failures
+            global_success_rate = (
+                total_success / total_answers if total_answers > 0 else 0
+            )
+
+            def _conclusion_by_rate(rate: float) -> str:
+                if rate < 0.25:
+                    return "Needs urgent reinforcement"
+                if rate < 0.5:
+                    return "Below expectations"
+                if rate < 0.75:
+                    return "On the right track"
+                return "Excellent mastery"
+
+            top_success = sorted(
+                question_stats,
+                key=lambda q: q["success"],
+                reverse=True
+            )[:3]
+            top_failures = sorted(
+                question_stats,
+                key=lambda q: q["failures"],
+                reverse=True
+            )[:3]
+
+            report = [
+                "📊 **Topic Statistics Report**",
+                f"**Topic:** {topic}",
+                f"**Total correct answers:** {total_success}",
+                f"**Total wrong answers:** {total_failures}",
+                f"**Total answers:** {total_answers}",
+                f"**Global success rate:** {global_success_rate * 100:.2f}%",
+                "",
+                "**Top 3 questions with most correct answers:**"
+            ]
+
+            if any(item["success"] > 0 for item in top_success):
+                for index, item in enumerate(top_success, start=1):
+                    snippet = item["question"][:120]
+                    suffix = "..." if len(item["question"]) > 120 else ""
+                    report.append(
+                        f"{index}. ({item['success']} correct) {snippet}{suffix}"
+                    )
+            else:
+                report.append("1. No correct-answer data yet.")
+
+            report.append("")
+            report.append("**Top 3 questions with most wrong answers:**")
+
+            if any(item["failures"] > 0 for item in top_failures):
+                for index, item in enumerate(top_failures, start=1):
+                    snippet = item["question"][:120]
+                    suffix = "..." if len(item["question"]) > 120 else ""
+                    report.append(
+                        f"{index}. ({item['failures']} wrong) {snippet}{suffix}"
+                    )
+            else:
+                report.append("1. No wrong-answer data yet.")
+
+            report.append("")
+            report.append(
+                f"**Auto conclusion:** {_conclusion_by_rate(global_success_rate)}"
+            )
+
+            if total_answers > 0:
+                pie_fig, pie_ax = plt.subplots(figsize=(6, 6))
+                pie_ax.pie(
+                    [total_success, total_failures],
+                    labels=["Correct", "Wrong"],
+                    colors=["green", "red"],
+                    autopct="%1.1f%%",
+                    startangle=90,
+                    wedgeprops={"edgecolor": "white", "linewidth": 1},
+                )
+                pie_ax.set_title("Correct vs Wrong Answers")
+                pie_ax.axis("equal")
+
+                pie_buf = io.BytesIO()
+                pie_fig.tight_layout()
+                pie_fig.savefig(pie_buf, format="png")
+                pie_buf.seek(0)
+                plt.close(pie_fig)
+
+                await interaction.followup.send(
+                    "\n".join(report),
+                    file=discord.File(fp=pie_buf, filename="topic_stats_pie.png"),
+                    ephemeral=True,
+                )
+            else:
+                report.append("\nNo answers yet, so the pie chart is not available.")
+                await interaction.followup.send("\n".join(report), ephemeral=True)
+
+        except Exception as e:
+            logging.error(f"Error retrieving topic statistics: {e}")
+
+            try:
+                await interaction.followup.send("❌ Error retrieving topic statistics.", ephemeral=True)
             except Exception:
                 logging.error("Failed to send error message to user")
