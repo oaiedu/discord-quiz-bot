@@ -1,6 +1,7 @@
 import logging
 import random
 import re
+import asyncio
 from discord import app_commands, Interaction, ButtonStyle
 import discord
 from discord.ui import View, Button
@@ -13,6 +14,8 @@ from repositories.topic_repository import get_questions_by_topic
 from utils.enum import QuestionType
 from utils.structured_logging import structured_logger as logger
 from utils.utils import autocomplete_quiz_topics, register_user_statistics, safe_defer
+from utils.llm_utils import evaluate_short_answer_semantic
+from views.short_answer_quiz_view import ShortAnswerInputView
 
 
 class QuizButton(Button):
@@ -246,3 +249,155 @@ def register(tree: app_commands.CommandTree):
                 pass
             logging.error(f"Error during quiz: {e}")
             await interaction.response.send_message("❌ An error occurred during the quiz.", ephemeral=True)
+
+    @tree.command(name="short_answer_quiz", description="Take a short-answer quiz with 5 questions on a topic")
+    @app_commands.describe(topic_name="Topic name")
+    @app_commands.autocomplete(topic_name=autocomplete_quiz_topics)
+    async def short_answer_quiz(interaction: discord.Interaction, topic_name: str):
+        if not await safe_defer(interaction, thinking=True, ephemeral=True):
+            return
+
+        try:
+            if interaction.guild:
+                update_server_last_interaction(interaction.guild.id)
+
+            questions_data = get_questions_by_topic(
+                interaction.guild.id,
+                topic_name,
+                include_types=[QuestionType.SHORT_ANSWER.value],
+            )
+
+            if not questions_data:
+                await interaction.followup.send(
+                    f"❌ There are no short-answer questions for {topic_name}.",
+                    ephemeral=True
+                )
+                return
+
+            questions = random.sample(questions_data, min(5, len(questions_data)))
+            await interaction.followup.send("📋 Starting the short-answer quiz...", ephemeral=True)
+
+            user_answers = []
+
+            for idx, q in enumerate(questions):
+                data = q.to_dict()
+                question_id = q.id
+                topic_id = q.reference.parent.parent.id
+
+                question_text = str(data.get("question", "")).strip()
+                correct_answer = str(data.get("correct_answer", data.get("answer", ""))).strip()
+
+                if not question_text or not correct_answer:
+                    logger.warning(
+                        "Skipping malformed Short Answer question due to missing question/correct_answer.",
+                        command="short_answer_quiz",
+                        user_id=str(interaction.user.id),
+                        username=interaction.user.display_name,
+                        guild_id=str(interaction.guild.id) if interaction.guild else None,
+                        topic=topic_name,
+                        question_id=question_id,
+                        operation="invalid_short_answer_payload"
+                    )
+                    continue
+
+                input_view = ShortAnswerInputView(owner_id=interaction.user.id, timeout=90)
+                prompt_msg = await interaction.followup.send(
+                    f"**{idx + 1}. {question_text}**\nClick the button to answer privately. You have 90 seconds.",
+                    view=input_view,
+                    ephemeral=True,
+                    wait=True,
+                )
+
+                try:
+                    selected_answer = await input_view.answer_future
+                except asyncio.TimeoutError:
+                    for item in input_view.children:
+                        item.disabled = True
+                    try:
+                        await prompt_msg.edit(view=input_view)
+                    except Exception:
+                        pass
+                    await interaction.followup.send("⏰ Time is up for this question.", ephemeral=True)
+                    return
+
+                for item in input_view.children:
+                    item.disabled = True
+                try:
+                    await prompt_msg.edit(view=input_view)
+                except Exception:
+                    pass
+                is_correct, reason = await evaluate_short_answer_semantic(correct_answer, selected_answer)
+
+                user_answers.append((selected_answer, correct_answer, is_correct, reason))
+
+                try:
+                    update_question_stats(
+                        interaction.guild.id,
+                        topic_id,
+                        question_id,
+                        is_correct
+                    )
+                except Exception as stats_error:
+                    logger.warning(
+                        f"Failed to update question stats: {stats_error}",
+                        command="short_answer_quiz",
+                        user_id=str(interaction.user.id),
+                        username=interaction.user.display_name,
+                        guild_id=str(interaction.guild.id) if interaction.guild else None,
+                        topic=topic_name,
+                        topic_id=topic_id,
+                        question_id=question_id,
+                        operation="update_question_stats_failed"
+                    )
+
+            if not user_answers:
+                await interaction.followup.send(
+                    "❌ No valid short-answer questions were found for this topic.",
+                    ephemeral=True,
+                )
+                return
+
+            result_text = "\n📊 Results:\n"
+            correct_count = 0
+
+            for i, (_, correct, is_correct, reason) in enumerate(user_answers):
+                if is_correct:
+                    result_text += f"✅ {i + 1}. Correct\n"
+                    correct_count += 1
+                else:
+                    result_text += f"❌ {i + 1}. Incorrect (Expected: {correct})\n"
+                    if reason:
+                        result_text += f"   Reason: {reason}\n"
+
+            result_text += f"\n🏁 You answered correctly {correct_count} out of {len(user_answers)} questions."
+            await interaction.followup.send(result_text, ephemeral=True)
+
+            type_list = [QuestionType.SHORT_ANSWER.value]
+            register_user_statistics(
+                interaction.user, topic_name, correct_count, len(user_answers), type_list
+            )
+            save_statistic(
+                interaction.guild.id, interaction.user, topic_name, correct_count, len(user_answers)
+            )
+
+            xp_gain = correct_count - (len(user_answers) - correct_count)
+            final_xp = add_xp(str(interaction.user.id), str(interaction.guild.id), xp_gain)
+            await interaction.followup.send(
+                f"✨ You gained {xp_gain} XP! Your total is now {final_xp} XP. Continue answering questions to earn more!",
+                ephemeral=True
+            )
+
+            streak = update_streak(
+                str(interaction.user.id),
+                str(interaction.guild.id),
+                correct_count == len(user_answers)
+            )
+            if streak >= 3:
+                await interaction.followup.send(f"🔥 You're on a streak! ({streak} in a row)", ephemeral=True)
+
+        except Exception as e:
+            logging.error(f"Error during short_answer_quiz: {e}")
+            try:
+                await interaction.followup.send("❌ An error occurred during the short-answer quiz.", ephemeral=True)
+            except Exception:
+                pass

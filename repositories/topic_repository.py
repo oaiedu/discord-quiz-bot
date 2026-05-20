@@ -103,7 +103,12 @@ def get_topics_by_server(guild_id: int, include_empty: bool = True):
         return []
 
 
-def get_questions_by_topic(guild_id: int, topic_title: str):
+def get_questions_by_topic(
+    guild_id: int,
+    topic_title: str,
+    include_types: list[str] | None = None,
+    exclude_types: list[str] | None = None,
+):
     try:
         topic_collection = db.collection("servers") \
             .document(str(guild_id)) \
@@ -116,7 +121,24 @@ def get_questions_by_topic(guild_id: int, topic_title: str):
             return []
 
         topic_doc = documents[0]
-        return topic_doc.reference.collection("questions").get()
+        question_docs = topic_doc.reference.collection("questions").get()
+
+        if not include_types and not exclude_types:
+            return question_docs
+
+        include_set = set(include_types or [])
+        exclude_set = set(exclude_types or [])
+
+        filtered = []
+        for doc in question_docs:
+            q_type = doc.to_dict().get("question_type", "True or False")
+            if include_set and q_type not in include_set:
+                continue
+            if q_type in exclude_set:
+                continue
+            filtered.append(doc)
+
+        return filtered
 
     except Exception as e:
         logging.error(
