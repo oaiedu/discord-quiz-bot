@@ -7,7 +7,7 @@ import discord
 
 from repositories import stats_repository, quiz_repository
 from repositories.server_repository import update_server_last_interaction
-from utils.utils import is_professor, professor_verification, safe_defer
+from utils.utils import is_professor, professor_verification, safe_defer, autocomplete_all_topics
 from utils.structured_logging import structured_logger as logger
 
 
@@ -215,3 +215,121 @@ def register(tree: app_commands.CommandTree):
                 await interaction.followup.send(f"❌ Error retrieving statistics. {e}", ephemeral=True)
             except Exception:
                 logging.error("Failed to send error message to user")
+
+    @tree.command(name="topic_stats", description="Muestra estadísticas detalladas de un tópico (solo profesorado)")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(topic="Nombre del tópico")
+    @app_commands.autocomplete(topic=autocomplete_all_topics)
+    async def topic_stats(interaction: discord.Interaction, topic: str):
+        try:
+            if interaction.guild_id is None:
+                await interaction.response.send_message(
+                    "⛔ Este comando solo puede usarse dentro de un servidor.",
+                    ephemeral=True
+                )
+                return
+
+            update_server_last_interaction(interaction.guild_id)
+
+            if not await professor_verification(interaction):
+                return
+
+            if not await safe_defer(interaction, thinking=True, ephemeral=True):
+                return
+
+            data = stats_repository.get_topic_statistics(interaction.guild_id, topic)
+
+            if not data:
+                await interaction.followup.send(
+                    f"📂 No se encontró el tópico '{topic}' o no hay datos disponibles.",
+                    ephemeral=True
+                )
+                return
+
+            def short_question(text: str, limit: int = 90):
+                return text if len(text) <= limit else text[:limit - 3] + "..."
+
+            top_success_lines = []
+            for i, q in enumerate(data["top_success_questions"], start=1):
+                top_success_lines.append(
+                    f"{i}. {short_question(q['question'])} ({q['success']} aciertos)"
+                )
+
+            top_failure_lines = []
+            for i, q in enumerate(data["top_failure_questions"], start=1):
+                top_failure_lines.append(
+                    f"{i}. {short_question(q['question'])} ({q['failures']} fallos)"
+                )
+
+            if not top_success_lines:
+                top_success_lines.append("Sin datos suficientes.")
+            if not top_failure_lines:
+                top_failure_lines.append("Sin datos suficientes.")
+
+            msg = (
+                f"📊 Estadísticas del tópico\n\n"
+                f"Topico: {data['topic']}\n"
+                f"Total aciertos: {data['total_success']}\n"
+                f"Total fallos: {data['total_failures']}\n"
+                f"Total respuestas: {data['total_answers']}\n"
+                f"% acierto global: {data['accuracy']:.2f}%\n\n"
+                f"Top 3 preguntas con más aciertos:\n" + "\n".join(top_success_lines) + "\n\n"
+                f"Top 3 preguntas con más fallos:\n" + "\n".join(top_failure_lines) + "\n\n"
+                f"Conclusión: {data['conclusion']}"
+            )
+
+            # --- Pie chart: correct vs failed ---
+            fig, ax = plt.subplots(figsize=(5, 5))
+
+            correct = data["total_success"]
+            failed = data["total_failures"]
+            total = data["total_answers"]
+
+            if total > 0:
+                sizes = [correct, failed]
+                labels = ["Aciertos", "Fallos"]
+                colors = ["#2E8B57", "#C0392B"]
+
+                ax.pie(
+                    sizes,
+                    labels=labels,
+                    colors=colors,
+                    autopct="%1.1f%%",
+                    startangle=90,
+                    wedgeprops={"edgecolor": "white", "linewidth": 1.2}
+                )
+                ax.set_title(f"Distribucion de respuestas - {data['topic']}")
+            else:
+                # Evita error de matplotlib cuando todo es 0
+                ax.pie(
+                    [1],
+                    labels=["Sin respuestas"],
+                    colors=["#95A5A6"],
+                    startangle=90,
+                    wedgeprops={"edgecolor": "white", "linewidth": 1.2}
+                )
+                ax.set_title(f"Distribucion de respuestas - {data['topic']}")
+
+            ax.axis("equal")
+
+            buf = io.BytesIO()
+            plt.tight_layout()
+            plt.savefig(buf, format="png", dpi=150)
+            buf.seek(0)
+            plt.close(fig)
+
+            await interaction.followup.send(
+                content=msg,
+                file=File(fp=buf, filename="topic_stats_pie.png"),
+                ephemeral=True
+            )
+
+        except Exception as e:
+            logging.error(f"Error in /topic_stats: {e}")
+            try:
+                await interaction.followup.send(
+                    "❌ Error al obtener estadísticas del tópico.",
+                    ephemeral=True
+                )
+            except Exception:
+                pass
