@@ -190,7 +190,8 @@ def register(tree: app_commands.CommandTree):
 
             str_to_enum = {
                 "Multiple Choice": QuestionType.MULTIPLE_CHOICE,
-                "True or False": QuestionType.TRUE_FALSE
+                "True or False": QuestionType.TRUE_FALSE,
+                "Short Answer": QuestionType.SHORT_ANSWER
             }
 
             if type not in str_to_enum:

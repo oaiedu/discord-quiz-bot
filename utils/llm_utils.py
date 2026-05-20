@@ -8,7 +8,7 @@ import fitz
 from google.cloud import storage
 from repositories.topic_repository import create_topic_with_questions
 from utils.enum import QuestionType
-from utils.prompts import prompt_default, prompt_multiple_choice, prompt_short_answer, prompt_true_false
+from utils.prompts import prompt_default, prompt_multiple_choice, prompt_short_answer, prompt_true_false, prompt_grade_short_answers
 
 load_dotenv()
 
@@ -329,6 +329,7 @@ async def generate_questions_from_pdf(topic_name, topic_id, guild_id, pdf_url, q
         switch = {
             QuestionType.MULTIPLE_CHOICE: prompt_multiple_choice,
             QuestionType.TRUE_FALSE: prompt_true_false,
+            QuestionType.SHORT_ANSWER: prompt_short_answer,
         }
         prompt_fn = switch.get(qtype, prompt_default)
         prompt_text = prompt_fn(topic_name, extracted_text, qty)
@@ -352,3 +353,80 @@ async def generate_questions_from_pdf(topic_name, topic_id, guild_id, pdf_url, q
     except Exception as e:
         print(f"⚠️ ERROR in generate_questions_from_pdf: {type(e).__name__}: {e}")
         return False
+
+def _safe_float(value, default=0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+def _parse_short_answer_grading(raw_text):
+    if not raw_text:
+        return None
+
+    stripped = raw_text.strip()
+    parsed = None
+
+    try:
+        parsed = json.loads(stripped)
+    except json.JSONDecodeError:
+        pass
+
+    if parsed is None and stripped.startswith("```"):
+        lines = stripped.splitlines()
+        if len(lines) >= 2 and lines[-1].strip().startswith("```"):
+            fenced_body = "\n".join(lines[1:-1]).strip()
+            try:
+                parsed = json.loads(fenced_body)
+            except json.JSONDecodeError:
+                parsed = None
+
+    if parsed is None:
+        obj_candidate = _extract_balanced_json_block(stripped, "{", "}")
+        if obj_candidate:
+            try:
+                parsed = json.loads(obj_candidate)
+            except json.JSONDecodeError:
+                parsed = None
+
+    if not isinstance(parsed, dict):
+        return None
+
+    score = max(0.0, min(10.0, _safe_float(parsed.get("score"), 0.0)))
+    summary = str(parsed.get("summary", "")).strip()
+    per_question = parsed.get("per_question", [])
+    if not isinstance(per_question, list):
+        per_question = []
+
+    normalized_items = []
+    for item in per_question:
+        if not isinstance(item, dict):
+            continue
+
+        question_index = int(_safe_float(item.get("question_index"), 0))
+        item_score = max(0.0, min(2.0, _safe_float(item.get("score"), 0.0)))
+        is_correct = bool(item.get("is_correct", False))
+        comment = str(item.get("comment", "")).strip()
+
+        normalized_items.append({
+            "question_index": question_index,
+            "score": item_score,
+            "is_correct": is_correct,
+            "comment": comment,
+        })
+
+    return {
+        "score": score,
+        "summary": summary,
+        "per_question": normalized_items,
+    }
+
+async def grade_short_answers(topic_name, answers_payload):
+    prompt_text = prompt_grade_short_answers(
+        topic_name,
+        json.dumps(answers_payload, ensure_ascii=False),
+    )
+
+    messages = [{"role": "user", "content": prompt_text}]
+    raw_result = await asyncio.wait_for(send_to_openrouter(messages), timeout=120)
+    return _parse_short_answer_grading(raw_result)
