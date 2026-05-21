@@ -4,6 +4,7 @@ import re
 from discord import app_commands, Interaction, ButtonStyle
 import discord
 from discord.ui import View, Button
+import json
 
 from repositories.level_repository import add_xp, update_streak
 from repositories.question_repository import update_question_stats
@@ -12,7 +13,12 @@ from repositories.stats_repository import save_statistic
 from repositories.topic_repository import get_questions_by_topic
 from utils.enum import QuestionType
 from utils.structured_logging import structured_logger as logger
-from utils.utils import autocomplete_quiz_topics, register_user_statistics, safe_defer
+from utils.utils import autocomplete_quiz_topics, register_user_statistics, safe_defer, professor_verification, update_last_interaction
+from views.general_quiz_view import GeneralQuizRegistrationView, GeneralQuizQuestionView
+
+GENERAL_QUIZ_SESSIONS: dict[int, dict] = {}
+GENERAL_QUIZ_BASE_POINTS = 100
+GENERAL_QUIZ_PENALTY_PER_SECOND = 2
 
 
 class QuizButton(Button):
@@ -79,6 +85,62 @@ def _extract_true_false_answer(data: dict) -> str | None:
             return normalized
     return None
 
+def _normalize_alternatives(raw_alternatives) -> dict[str, str]:
+    if isinstance(raw_alternatives, dict):
+        normalized = {
+            str(letter).strip().upper(): str(text).strip()
+            for letter, text in raw_alternatives.items()
+            if str(letter).strip() and str(text).strip()
+        }
+        return dict(sorted(normalized.items(), key=lambda item: item[0]))
+
+    if isinstance(raw_alternatives, list):
+        normalized: dict[str, str] = {}
+        for index, text in enumerate(raw_alternatives):
+            label = chr(ord("A") + index)
+            value = str(text).strip()
+            if value:
+                normalized[label] = value
+        return normalized
+
+    if isinstance(raw_alternatives, str):
+        value = raw_alternatives.strip()
+        if not value:
+            return {}
+
+        # Try parsing serialized alternatives (JSON object/list).
+        try:
+            parsed = json.loads(value)
+            return _normalize_alternatives(parsed)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            pass
+
+        normalized = {}
+        for line in value.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            match = re.match(r"^([A-Za-z])[\)\.:\-\s]+(.+)$", line)
+            if match:
+                normalized[match.group(1).upper()] = match.group(2).strip()
+        if normalized:
+            return dict(sorted(normalized.items(), key=lambda item: item[0]))
+
+    return {}
+
+
+def _normalize_multiple_choice_answer(value: str) -> str | None:
+    if value is None:
+        return None
+
+    normalized = str(value).strip().upper()
+    if not normalized:
+        return None
+
+    match = re.search(r"[A-Z]", normalized)
+    if not match:
+        return None
+    return match.group(0)
 
 def register(tree: app_commands.CommandTree):
 
@@ -246,3 +308,262 @@ def register(tree: app_commands.CommandTree):
                 pass
             logging.error(f"Error during quiz: {e}")
             await interaction.response.send_message("❌ An error occurred during the quiz.", ephemeral=True)
+
+    @tree.command(name="general_quiz", description="Start a general quiz session (Professors only)")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(topic="Topic name")
+    @app_commands.autocomplete(topic=autocomplete_quiz_topics)
+    async def general_quiz(interaction: discord.Interaction, topic: str):
+        if not await professor_verification(interaction):
+            return
+
+        try:
+            update_last_interaction(interaction.guild.id)
+
+            guild_id = interaction.guild.id
+            session = {
+                "guild_id": guild_id,
+                "topic": topic,
+                "owner_id": interaction.user.id,
+                "users": set(),
+                "is_open": True,
+            }
+            GENERAL_QUIZ_SESSIONS[guild_id] = session
+
+            view = GeneralQuizRegistrationView(session=session, timeout=60)
+            await interaction.response.send_message(
+                (
+                    f"🎯 General quiz on **{topic}** is starting!\n"
+                    "Click **Join quiz** to register. Registration closes in 60 seconds."
+                ),
+                view=view,
+            )
+
+            try:
+                message = await interaction.original_response()
+                view.message = message
+                session["message_id"] = message.id
+            except Exception:
+                pass
+
+            await view.wait()
+
+            registered_users = session.get("users", set())
+            if not registered_users:
+                await interaction.followup.send(
+                    "😶 No one registered. The quiz has been cancelled.",
+                    ephemeral=False,
+                )
+                return
+
+            user_mentions = "\n".join(f"- <@{user_id}>" for user_id in registered_users)
+            await interaction.followup.send(
+                (
+                    "🎉 Welcome to the general quiz!\n"
+                    "✅ Registered players:\n"
+                    f"{user_mentions}\n\n"
+                    "🧪 Test starting..."
+                ),
+                ephemeral=False,
+            )
+
+            session["scores"] = {user_id: 0 for user_id in registered_users}
+
+            questions_data = get_questions_by_topic(interaction.guild.id, topic)
+            if not questions_data:
+                await interaction.followup.send(
+                    "❌ No questions found for this topic.",
+                    ephemeral=False,
+                )
+                return
+
+            eligible_questions = []
+            for question_doc in questions_data:
+                question_type = (question_doc.to_dict() or {}).get("question_type")
+                if question_type in (
+                    QuestionType.MULTIPLE_CHOICE.value,
+                    QuestionType.TRUE_FALSE.value,
+                    None,
+                    "",
+                ):
+                    eligible_questions.append(question_doc)
+
+            valid_questions = []
+            for q in eligible_questions:
+                data = q.to_dict() or {}
+                q_type = data.get("question_type", QuestionType.TRUE_FALSE.value)
+
+                if q_type == QuestionType.MULTIPLE_CHOICE.value:
+                    alternatives = _normalize_alternatives(data.get("alternatives", {}))
+                    correct = _normalize_multiple_choice_answer(data.get("correct_answer", ""))
+                    if alternatives and correct and correct in alternatives:
+                        valid_questions.append(q)
+                else:
+                    correct = _extract_true_false_answer(data)
+                    if correct:
+                        valid_questions.append(q)
+
+            if len(valid_questions) < 5:
+                await interaction.followup.send(
+                    (
+                        f"❌ Topic `{topic}` has only {len(valid_questions)} valid questions for this quiz. "
+                        "You need at least 5 valid Multiple Choice/True-False questions."
+                    ),
+                    ephemeral=False,
+                )
+                return
+
+            selected_questions = random.sample(valid_questions, 5)
+
+            for idx, q in enumerate(selected_questions, start=1):
+                data = q.to_dict() or {}
+                question_id = q.id
+                q_type = data.get("question_type", QuestionType.TRUE_FALSE.value)
+                question_text = str(data.get("question", "")).strip()
+
+                if not question_text:
+                    continue
+
+                alternatives = (
+                    _normalize_alternatives(data.get("alternatives", {}))
+                    if q_type == QuestionType.MULTIPLE_CHOICE.value
+                    else {"T": "True", "F": "False"}
+                )
+
+                if q_type == QuestionType.MULTIPLE_CHOICE.value:
+                    correct = _normalize_multiple_choice_answer(data.get("correct_answer", ""))
+                    if not correct or correct not in alternatives:
+                        continue
+                else:
+                    correct = _extract_true_false_answer(data)
+                    if not correct:
+                        continue
+
+                question_lines = [f"**{idx}. {question_text}**"]
+                for letter, alt_text in alternatives.items():
+                    question_lines.append(f"{letter}. {alt_text}")
+
+                view = GeneralQuizQuestionView(
+                    alternatives=alternatives,
+                    correct_answer=correct,
+                    session=session,
+                    question_id=question_id,
+                    allowed_users=registered_users,
+                    timeout=25,
+                )
+
+                question_message = await interaction.followup.send(
+                    "\n".join(question_lines),
+                    view=view,
+                    ephemeral=False,
+                    wait=True,
+                )
+                view.message = question_message
+                await view.wait()
+
+                answers = session.get("answers", [])
+                question_answers = [
+                    answer for answer in answers
+                    if answer.get("question_id") == question_id
+                ]
+
+                gains = {user_id: 0 for user_id in registered_users}
+                for answer in question_answers:
+                    user_id = answer.get("user_id")
+                    if user_id not in gains or not answer.get("is_correct"):
+                        continue
+
+                    elapsed = float(answer.get("elapsed", 0.0))
+                    penalty = int(GENERAL_QUIZ_PENALTY_PER_SECOND * elapsed)
+                    points = max(GENERAL_QUIZ_BASE_POINTS - penalty, 0)
+                    gains[user_id] = points
+                    session["scores"][user_id] += points
+
+                if idx < len(selected_questions):
+                    ranking = sorted(
+                        registered_users,
+                        key=lambda uid: session["scores"].get(uid, 0),
+                        reverse=True,
+                    )
+                    ranking_lines = ["🏁 Question results:"]
+                    for position, user_id in enumerate(ranking, start=1):
+                        ranking_lines.append(
+                            (
+                                f"{position}. <@{user_id}>: {session['scores'][user_id]} pts "
+                                f"(+{gains[user_id]})"
+                            )
+                        )
+
+                    await interaction.followup.send(
+                        "\n".join(ranking_lines),
+                        ephemeral=False,
+                    )
+
+            final_ranking = sorted(
+                registered_users,
+                key=lambda uid: session["scores"].get(uid, 0),
+                reverse=True,
+            )
+
+            results_lines = ["📊 Final ranking:"]
+            for position, user_id in enumerate(final_ranking, start=1):
+                results_lines.append(
+                    f"{position}. <@{user_id}>: {session['scores'][user_id]} pts"
+                )
+
+            await interaction.followup.send(
+                "\n".join(results_lines),
+                ephemeral=False,
+            )
+
+            answers = session.get("answers", [])
+            stats_map: dict[int, dict[str, int]] = {
+                user_id: {"correct": 0, "total": 0}
+                for user_id in registered_users
+            }
+
+            for answer in answers:
+                user_id = answer.get("user_id")
+                if user_id not in stats_map:
+                    continue
+                stats_map[user_id]["total"] += 1
+                if answer.get("is_correct"):
+                    stats_map[user_id]["correct"] += 1
+
+            xp_lines = ["✨ XP rewards:"]
+            for user_id in final_ranking:
+                stats = stats_map[user_id]
+                correct = stats["correct"]
+                total = stats["total"]
+                incorrect = max(total - correct, 0)
+                xp_gain = correct - incorrect
+
+                final_xp = add_xp(str(user_id), str(interaction.guild.id), xp_gain)
+                is_perfect = total > 0 and correct == total
+                streak = update_streak(str(user_id), str(interaction.guild.id), is_perfect)
+
+                streak_text = f" 🔥 Streak {streak}" if streak >= 3 else ""
+                xp_lines.append(
+                    f"- <@{user_id}>: {xp_gain} XP (Total: {final_xp}){streak_text}"
+                )
+
+            await interaction.followup.send(
+                "\n".join(xp_lines),
+                ephemeral=False,
+            )
+
+        except Exception as e:
+            try:
+                if interaction.response.is_done():
+                    await interaction.followup.send(
+                        "❌ Failed to start general quiz registration.",
+                        ephemeral=True,
+                    )
+                else:
+                    await interaction.response.send_message(
+                        "❌ Failed to start general quiz registration.",
+                        ephemeral=True,
+                    )
+            except Exception:
+                pass
+            logging.error(f"Error during quiz: {e}")
