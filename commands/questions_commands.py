@@ -7,6 +7,7 @@ from utils.enum import QuestionType
 from utils.llm_utils import generate_questions_from_pdf
 from utils.structured_logging import structured_logger as logger
 from utils.utils import professor_verification, update_last_interaction, autocomplete_question_type, is_professor, autocomplete_topics, autocomplete_all_topics, autocomplete_TF, safe_defer
+from views.add_question_view import AddTrueFalseQuestionModal, AddMultipleChoiceQuestionModal, AddShortAnswerQuestionModal
 
 # Register commands
 
@@ -18,41 +19,68 @@ def register(tree: app_commands.CommandTree):
     @app_commands.describe(
         topic="Topic name",
         question="Question text",
-        answer="Correct answer (T or F)"
+        type="Question type",
     )
-    @app_commands.autocomplete(topic=autocomplete_all_topics, answer=autocomplete_TF)
-    async def add_question_command(interaction: Interaction, topic: str, question: str, answer: str):
-        # Immediate defer to avoid Discord timeout (3 seconds)
+    @app_commands.autocomplete(topic=autocomplete_all_topics, type=autocomplete_question_type)
+    async def add_question_command(interaction: Interaction, topic: str, question: str, type: str):
         if not await professor_verification(interaction):
-            return
-        if not await safe_defer(interaction, thinking=True, ephemeral=True):
             return
 
         try:
             update_last_interaction(interaction.guild.id)
 
-            if answer.upper() not in ["T", "F"]:
-                await interaction.followup.send("❌ Answer must be 'V' or 'F'", ephemeral=True)
-                logger.warning(f"❌ Invalid answer in /add_question: {answer}",
-                               command="add_question",
-                               user_id=str(interaction.user.id),
-                               username=interaction.user.display_name,
-                               guild_id=str(
-                                   interaction.guild.id) if interaction.guild else None,
-                               invalid_answer=answer,
-                               operation="validation_error")
+            async def on_save(modal_interaction: Interaction, payload: dict):
+                try:
+                    await modal_interaction.response.defer(ephemeral=True, thinking=False)
+
+                    new_id = add_question(
+                        guild_id=modal_interaction.guild.id,
+                        topic=topic,
+                        question_data=payload,
+                    )
+
+                    await modal_interaction.followup.send(
+                        f"✅ Question added to {topic} with ID: {new_id}.",
+                        ephemeral=True,
+                    )
+                except Exception as e:
+                    try:
+                        await modal_interaction.followup.send(
+                            f"❌ Failed to add question: {e}",
+                            ephemeral=True,
+                        )
+                    except Exception:
+                        pass
+
+            type_map = {
+                QuestionType.TRUE_FALSE.value: AddTrueFalseQuestionModal,
+                QuestionType.MULTIPLE_CHOICE.value: AddMultipleChoiceQuestionModal,
+                QuestionType.SHORT_ANSWER.value: AddShortAnswerQuestionModal,
+            }
+
+            modal_cls = type_map.get(type)
+            if not modal_cls:
+                await interaction.response.send_message(
+                    "❌ Invalid question type. Use Multiple Choice, True or False, or Short Answer.",
+                    ephemeral=True,
+                )
                 return
 
-            new_id = add_question(interaction.guild.id,
-                                  topic, question, answer.upper())
-            await interaction.followup.send(
-                f"✅ Question added to `{topic}` with ID: `{new_id}`.",
-                ephemeral=True
-            )
+            modal = modal_cls(topic=topic, question_text=question, on_save=on_save)
+            await interaction.response.send_modal(modal)
 
         except Exception as e:
             try:
-                await interaction.followup.send(f"❌ Failed to add question: {e}", ephemeral=True)
+                if interaction.response.is_done():
+                    await interaction.followup.send(
+                        f"❌ Failed to start add question flow: {e}",
+                        ephemeral=True,
+                    )
+                else:
+                    await interaction.response.send_message(
+                        f"❌ Failed to start add question flow: {e}",
+                        ephemeral=True,
+                    )
             except Exception:
                 pass
 
