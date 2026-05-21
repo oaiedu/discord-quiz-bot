@@ -7,54 +7,99 @@ from utils.enum import QuestionType
 from utils.llm_utils import generate_questions_from_pdf
 from utils.structured_logging import structured_logger as logger
 from utils.utils import professor_verification, update_last_interaction, autocomplete_question_type, is_professor, autocomplete_topics, autocomplete_all_topics, autocomplete_TF, safe_defer
+from views.add_question_modals import AddTrueFalseQuestionModal, AddShortAnswerQuestionModal, AddMultipleChoiceQuestionModal
+
+
+def _resolve_question_type(raw_type: str) -> QuestionType | None:
+    try:
+        return QuestionType(raw_type)
+    except ValueError:
+        normalized_type = str(raw_type).strip().upper().replace(" ", "_")
+        if normalized_type in QuestionType.__members__:
+            return QuestionType[normalized_type]
+        return None
 
 # Register commands
 
-
 def register(tree: app_commands.CommandTree):
-
+    
     @tree.command(name="add_question", description="Add a question to a topic (Professors only)")
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(
         topic="Topic name",
         question="Question text",
-        answer="Correct answer (T or F)"
+        type="Question type",
     )
-    @app_commands.autocomplete(topic=autocomplete_all_topics, answer=autocomplete_TF)
-    async def add_question_command(interaction: Interaction, topic: str, question: str, answer: str):
-        # Immediate defer to avoid Discord timeout (3 seconds)
+    @app_commands.autocomplete(topic=autocomplete_all_topics, type=autocomplete_question_type)
+    async def add_question_command(
+        interaction: Interaction,
+        topic: str,
+        question: str,
+        type: str,
+    ):
         if not await professor_verification(interaction):
-            return
-        if not await safe_defer(interaction, thinking=True, ephemeral=True):
             return
 
         try:
-            update_last_interaction(interaction.guild.id)
-
-            if answer.upper() not in ["T", "F"]:
-                await interaction.followup.send("❌ Answer must be 'V' or 'F'", ephemeral=True)
-                logger.warning(f"❌ Invalid answer in /add_question: {answer}",
-                               command="add_question",
-                               user_id=str(interaction.user.id),
-                               username=interaction.user.display_name,
-                               guild_id=str(
-                                   interaction.guild.id) if interaction.guild else None,
-                               invalid_answer=answer,
-                               operation="validation_error")
+            guild_id = interaction.guild.id if interaction.guild else interaction.guild_id
+            if guild_id is None:
+                await interaction.response.send_message(
+                    "❌ This command can only be used in a server.",
+                    ephemeral=True,
+                )
                 return
 
-            new_id = add_question(interaction.guild.id,
-                                  topic, question, answer.upper())
-            await interaction.followup.send(
-                f"✅ Question added to `{topic}` with ID: `{new_id}`.",
-                ephemeral=True
-            )
+            update_last_interaction(guild_id)
+
+            if not str(question).strip():
+                await interaction.response.send_message("❌ Question cannot be empty.", ephemeral=True)
+                return
+
+            topic_data = get_topic_by_name(guild_id, topic)
+            if not topic_data:
+                await interaction.response.send_message(
+                    f"❌ Topic '{topic}' does not exist.",
+                    ephemeral=True,
+                )
+                return
+
+            question_type = _resolve_question_type(type)
+            if not question_type:
+                await interaction.response.send_message(
+                    f"❌ Invalid question type: {type}",
+                    ephemeral=True,
+                )
+                return
+
+            if question_type == QuestionType.TRUE_FALSE:
+                await interaction.response.send_modal(
+                    AddTrueFalseQuestionModal(topic=topic, question=question)
+                )
+            elif question_type == QuestionType.SHORT_ANSWER:
+                await interaction.response.send_modal(
+                    AddShortAnswerQuestionModal(topic=topic, question=question)
+                )
+            elif question_type == QuestionType.MULTIPLE_CHOICE:
+                await interaction.response.send_modal(
+                    AddMultipleChoiceQuestionModal(topic=topic, question=question)
+                )
+            else:
+                await interaction.response.send_message(
+                    f"❌ Unsupported question type: {question_type.value}",
+                    ephemeral=True,
+                )
 
         except Exception as e:
-            try:
-                await interaction.followup.send(f"❌ Failed to add question: {e}", ephemeral=True)
-            except Exception:
-                pass
+            if interaction.response.is_done():
+                try:
+                    await interaction.followup.send(f"❌ Failed to start add question flow: {e}", ephemeral=True)
+                except Exception:
+                    pass
+            else:
+                await interaction.response.send_message(
+                    f"❌ Failed to start add question flow: {e}",
+                    ephemeral=True,
+                )
 
     @tree.command(name="list_questions", description="List questions for a topic (Professors only)")
     @app_commands.default_permissions(administrator=True)
