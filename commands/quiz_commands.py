@@ -4,6 +4,8 @@ import re
 from discord import app_commands, Interaction, ButtonStyle
 import discord
 from discord.ui import View, Button
+import asyncio
+import math
 
 from repositories.level_repository import add_xp, update_streak
 from repositories.question_repository import update_question_stats
@@ -12,8 +14,8 @@ from repositories.stats_repository import save_statistic
 from repositories.topic_repository import get_questions_by_topic
 from utils.enum import QuestionType
 from utils.structured_logging import structured_logger as logger
-from utils.utils import autocomplete_quiz_topics, register_user_statistics, safe_defer
-
+from utils.utils import autocomplete_quiz_topics, register_user_statistics, safe_defer, professor_verification
+from views.general_quiz_view import QuizView, GeneralQuizJoinView, GeneralQuizQuestionView
 
 class QuizButton(Button):
     def __init__(self, label: str, correct_answer: str, on_click_callback, parent_view: View):
@@ -77,6 +79,55 @@ def _extract_true_false_answer(data: dict) -> str | None:
         normalized = _normalize_true_false(value)
         if normalized:
             return normalized
+    return None
+
+
+def _normalize_multiple_choice_alternatives(raw):
+    if isinstance(raw, dict):
+        out = {}
+        for k, v in raw.items():
+            key = str(k).strip().upper()
+            if key in {"A", "B", "C", "D"}:
+                out[key] = str(v).strip()
+        
+        # Forzar orden visual y de botones: A, B, C, D
+        return {k: out[k] for k in ("A", "B", "C", "D") if k in out}
+
+    if isinstance(raw, list):
+        letters = ["A", "B", "C", "D"]
+        out = {}
+        for i, v in enumerate(raw[:4]):
+            out[letters[i]] = str(v).strip()
+        return out
+
+    return None
+
+def _normalize_multiple_choice_answer(raw, alternatives: dict) -> str | None:
+    if raw is None:
+        return None
+
+    s = str(raw).strip()
+    if not s:
+        return None
+
+    upper = s.upper()
+
+    # Casos: "A", "b", "C)", "D."
+    m = re.match(r"^\s*([ABCD])\s*[\)\.\:\-]?\s*$", upper)
+    if m:
+        return m.group(1)
+
+    # Casos: "answer: B", "option C", "respuesta D"
+    m = re.search(r"\b(?:ANSWER|OPTION|RESPUESTA)?\s*[:\-]?\s*([ABCD])\b", upper)
+    if m:
+        return m.group(1)
+
+    # Si viene el texto completo de la opción
+    normalized_text = upper.strip()
+    for letter, option_text in alternatives.items():
+        if normalized_text == str(option_text).strip().upper():
+            return letter
+
     return None
 
 
@@ -246,3 +297,207 @@ def register(tree: app_commands.CommandTree):
                 pass
             logging.error(f"Error during quiz: {e}")
             await interaction.response.send_message("❌ An error occurred during the quiz.", ephemeral=True)
+
+            
+    @tree.command(name="general_quiz", description="Start a general quiz for everyone")
+    @app_commands.describe(topic_name="Topic name")
+    @app_commands.autocomplete(topic_name=autocomplete_quiz_topics)
+    async def general_quiz(interaction: discord.Interaction, topic_name: str):
+        if not await safe_defer(interaction, thinking=True, ephemeral=False):
+            return
+        if not await professor_verification(interaction):
+            return
+
+        update_server_last_interaction(interaction.guild.id)
+
+        questions_data = get_questions_by_topic(
+            interaction.guild.id,
+            topic_name,
+            exclude_types=[QuestionType.SHORT_ANSWER.value],
+        )
+        if not questions_data:
+            await interaction.followup.send(
+                f"❌ No hay preguntas T/F o multiple choice para {topic_name}.",
+                ephemeral=True
+            )
+            return
+
+        questions = random.sample(questions_data, min(5, len(questions_data)))
+
+        # 1) Join window (60s)
+        join_view = GeneralQuizJoinView(timeout=None)
+        join_msg = await interaction.followup.send(
+            f"📣 ¡Arranca el quiz general de **{topic_name}**! Pulsa **Unirme** para entrar. Tienes **60s**.",
+            view=join_view,
+            wait=True
+        )
+        await asyncio.sleep(60)  # Wait for 60 seconds
+        join_view.disable_all()
+        await join_msg.edit(view=join_view)
+
+        participants = join_view.participants  # set of user_ids
+        if not participants:
+            await interaction.followup.send("❌ Nadie se unio al quiz.")
+            return
+
+        participant_names = []
+        for uid in participants:
+            member = interaction.guild.get_member(uid)
+            if member:
+                participant_names.append(member.display_name)
+            else:
+                participant_names.append(str(uid))
+
+        participants_text = "\n".join(participant_names) if participant_names else "Nadie"
+        await interaction.followup.send(f"✅ Participantes confirmados:\n{participants_text}")
+
+        # 2) Preguntas en loop
+        user_scores = {uid: {"correct": 0, "total": 0, "points": 0} for uid in participants}
+
+        valid_questions = 0
+
+        for idx, q in enumerate(questions):
+            data = q.to_dict()
+            question_id = q.id
+            topic_id = q.reference.parent.parent.id
+            q_type = data.get("question_type", "True/False")
+
+            raw_question = str(data.get("question", "")).strip()
+            if not raw_question:
+                continue
+
+            if q_type == QuestionType.MULTIPLE_CHOICE.value:
+                raw_alternatives = data.get("alternatives")
+                if raw_alternatives in (None, "", {}):
+                    raw_alternatives = data.get("options")
+
+                alternatives = _normalize_multiple_choice_alternatives(raw_alternatives)
+                if not alternatives:
+                    logger.warning(
+                        "Skipping malformed Multiple Choice question due to invalid alternatives/options.",
+                        command="general_quiz",
+                        user_id=str(interaction.user.id),
+                        username=interaction.user.display_name,
+                        guild_id=str(interaction.guild.id) if interaction.guild else None,
+                        topic=topic_name,
+                        question_id=question_id,
+                        operation="invalid_multiple_choice_alternatives"
+                    )
+                    continue
+
+                raw_correct = data.get("correct_answer", data.get("answer", ""))
+                correct = _normalize_multiple_choice_answer(raw_correct, alternatives)
+                if not correct or correct not in alternatives:
+                    logger.warning(
+                        "Skipping malformed Multiple Choice question due to invalid correct answer.",
+                        command="general_quiz",
+                        user_id=str(interaction.user.id),
+                        username=interaction.user.display_name,
+                        guild_id=str(interaction.guild.id) if interaction.guild else None,
+                        topic=topic_name,
+                        question_id=question_id,
+                        raw_answer=str(raw_correct),
+                        operation="invalid_multiple_choice_answer"
+                    )
+                    continue
+            else:
+                alternatives = {"T": "True", "F": "False"}
+                correct = _extract_true_false_answer(data)
+                if not correct:
+                    logger.warning(
+                        "Skipping malformed True/False question due to invalid answer field.",
+                        command="general_quiz",
+                        user_id=str(interaction.user.id),
+                        username=interaction.user.display_name,
+                        guild_id=str(interaction.guild.id) if interaction.guild else None,
+                        topic=topic_name,
+                        question_id=question_id,
+                        raw_answer=str(data.get("correct_answer", data.get("answer"))),
+                        operation="invalid_true_false_answer"
+                    )
+                    continue
+
+            question_text = f"**{idx + 1}. {raw_question}**"
+            for letter, alt_text in alternatives.items():
+                question_text += f"\n{letter}. {alt_text}"
+
+            question_view = GeneralQuizQuestionView(
+                alternatives=alternatives,
+                correct_answer=correct,
+                participants=participants,
+                timeout=None,
+            )
+
+            msg = await interaction.followup.send(
+                question_text,
+                view=question_view
+            )
+
+            await asyncio.sleep(60)  # Wait for 60 seconds
+            question_view.disable_all()
+            await msg.edit(view=question_view)
+
+            for uid, selected in question_view.answers.items():
+                is_correct = selected == correct
+                user_scores[uid]["total"] += 1
+                if is_correct:
+                    user_scores[uid]["correct"] += 1
+                    answered_at = question_view.answer_times.get(uid, question_view.start_time)
+                    elapsed = max(0.0, answered_at - question_view.start_time)
+                    score = max(0, math.ceil(100 * (1 - elapsed / 60.0)))
+                    user_scores[uid]["points"] += score
+
+            if idx + 1 < len(questions):
+                lines = [f"📊 Clasificacion provisional (pregunta {idx + 1}):"]
+
+                sorted_scores = sorted(
+                    user_scores.items(),
+                    key=lambda item: (item[1].get("correct", 0), item[1].get("points", 0)),
+                    reverse=True
+                )
+
+                for uid, stats in sorted_scores:
+                    member = interaction.guild.get_member(uid)
+                    name = member.display_name if member else str(uid)
+                    lines.append(f"- {name}-- {stats['correct']} aciertos-- {stats['points']} puntos")
+
+                await interaction.followup.send("\n".join(lines))
+
+            valid_questions += 1
+
+        if valid_questions == 0:
+            await interaction.followup.send(
+                "❌ No se encontraron preguntas validas para este quiz."
+            )
+            return
+        
+        # 3) Persistencia stats + XP por usuario
+        for uid, stats in user_scores.items():
+            member = interaction.guild.get_member(uid)
+            if not member:
+                continue
+            register_user_statistics(
+                member, topic_name, stats["correct"], stats["total"],
+                [QuestionType.TRUE_FALSE.value, QuestionType.MULTIPLE_CHOICE.value]
+            )
+            save_statistic(interaction.guild.id, member, topic_name, stats["correct"], stats["total"])
+            xp_gain = stats["correct"] - (stats["total"] - stats["correct"])
+            add_xp(str(uid), str(interaction.guild.id), xp_gain)
+            update_streak(str(uid), str(interaction.guild.id), stats["correct"] == stats["total"])
+        
+        lines = ["🏆 Clasificacion final"]
+
+        sorted_scores = sorted(
+            user_scores.items(),
+            key=lambda item: (item[1].get("correct", 0), item[1].get("points", 0)),
+            reverse=True
+        )
+
+        for uid, stats in sorted_scores:
+            member = interaction.guild.get_member(uid)
+            name = member.display_name if member else str(uid)
+            lines.append(f"- {name}-- {stats['correct']} aciertos-- {stats['points']} puntos")
+
+        await interaction.followup.send("\n".join(lines))
+
+        await interaction.followup.send("✅ Fin del quiz. ¡Gracias por participar!")
