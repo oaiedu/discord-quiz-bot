@@ -39,26 +39,74 @@ def list_questions_by_topic(guild_id: int, topic: str):
         return []
 
 
-def add_question(guild_id: int, topic: str, question: str, answer: str):
+def add_question(guild_id: int, topic: str, question_data: dict):
     try:
         topic_doc_ref = _get_topic_ref_by_name(guild_id, topic)
         questions_ref = topic_doc_ref.collection("questions")
 
+        question_text = str(question_data.get("question", "")).strip()
+        question_type = str(question_data.get("question_type", "")).strip()
+        correct_answer_raw = str(question_data.get("correct_answer", "")).strip()
+
+        if not question_text:
+            raise ValueError("question cannot be empty")
+        if not question_type:
+            raise ValueError("question_type is required")
+        if not correct_answer_raw:
+            raise ValueError("correct_answer is required")
+
+        upper_answer = correct_answer_raw.upper()
+        if question_type == "True or False":
+            if upper_answer in ("T", "TRUE", "V", "VERDADERO"):
+                correct_answer = "True"
+            elif upper_answer in ("F", "FALSE", "FALSO"):
+                correct_answer = "False"
+            else:
+                raise ValueError("Invalid True/False answer")
+        else:
+            correct_answer = correct_answer_raw
+
+        alternatives = question_data.get("alternatives")
+        if question_type == "Multiple Choice":
+            if not isinstance(alternatives, dict):
+                raise ValueError("alternatives must be a dict for Multiple Choice")
+            normalized_alternatives = {
+                str(k).strip().upper(): str(v).strip()
+                for k, v in alternatives.items()
+                if str(k).strip() and str(v).strip()
+            }
+            if set(normalized_alternatives.keys()) != {"A", "B", "C", "D"}:
+                raise ValueError("alternatives must contain exactly A, B, C, D")
+            stored_alternatives = normalized_alternatives
+        else:
+            stored_alternatives = ""
+
         new_ref = questions_ref.document()
-        new_ref.set({
-            "question": question,
-            "correct_answer": answer
-        })
+        question_id = new_ref.id
+
+        payload = {
+            "question_id": question_id,
+            "question": question_text,
+            "question_type": question_type,
+            "correct_answer": correct_answer,
+            "alternatives": stored_alternatives,
+            "success": 0,
+            "failures": 0,
+        }
+
+        new_ref.set(payload)
+
         topic_doc_ref.update({
             "num_quizzes_generated": Increment(1)
         })
-        return new_ref.id
+
+        return question_id
 
     except Exception as e:
         logging.error(
-            f"Error adding question to topic '{topic}' in server {guild_id}: {e}")
-        raise  # re-raise the error for external handling if needed
-
+            f"Error adding question to topic '{topic}' in server {guild_id}: {e}"
+        )
+        raise
 
 def delete_question(guild_id: int, topic: str, question_id: str):
     try:
