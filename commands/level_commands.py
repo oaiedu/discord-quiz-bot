@@ -12,7 +12,7 @@ from repositories.stats_repository import save_statistic
 from repositories.topic_repository import get_questions_by_topic
 from utils.enum import QuestionType
 from utils.structured_logging import structured_logger as logger
-from utils.utils import autocomplete_topics, is_professor, professor_verification, register_user_statistics, update_last_interaction
+from utils.utils import autocomplete_topics, is_professor, professor_verification, register_user_statistics, update_last_interaction, safe_defer
 
 
 def register(tree: app_commands.CommandTree):
@@ -20,30 +20,37 @@ def register(tree: app_commands.CommandTree):
     @tree.command(name="rank", description="Show the top XP leaderboard in the server")
     async def global_rank(interaction: discord.Interaction):
         try:
+            if not await safe_defer(interaction, thinking=True, ephemeral=True):
+                return
+
             update_last_interaction(interaction.guild.id)
 
             leaderboard = get_leaderboard(str(interaction.guild.id), limit=5)
-            leaderboard = get_leaderboard(str(interaction.guild.id), limit=5)
             if not leaderboard or len(leaderboard) == 0:
-                await interaction.response.send_message(
-                "📊 No leaderboard data available yet!\n"
-                "Complete some quizzes to appear on the leaderboard.",
-                ephemeral=True
-            )
+                await interaction.followup.send(
+                    "📊 No leaderboard data available yet!\n"
+                    "Complete some quizzes to appear on the leaderboard.",
+                    ephemeral=True
+                )
                 return
             msg = "🏆 **Leaderboard**\n"
             for idx, (user_id, xp, level) in enumerate(leaderboard, start=1):
                 user = await interaction.guild.fetch_member(user_id)
                 msg += f"{idx}. {user.display_name} — {xp} XP (Level {level})\n"
 
-            await interaction.response.send_message(msg)
+            await interaction.followup.send(msg)
 
 
         except Exception as e:
-            await interaction.response.send_message(
-                "❌ An error occurred while fetching the leaderboard.",
-                ephemeral=True
-            )
+            logging.error(f"Error fetching rank leaderboard: {e}")
+            try:
+                await interaction.followup.send(
+                    "❌ An error occurred while fetching the leaderboard.",
+                    ephemeral=True
+                )
+            except Exception:
+                pass
+
 
     @tree.command(name="my_rank", description="Show your XP and level")
     async def personal_rank(interaction: discord.Interaction):
