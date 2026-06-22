@@ -411,8 +411,8 @@ jobs:
           fi
 
       - name: Upsert PR quality comment
-        if: always()
-        uses: actions/github-script@v7
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
         env:
           SYNTAX_STATUS: ${{ steps.metrics.outputs.syntax }}
           LINT_STATUS: ${{ steps.metrics.outputs.lint }}
@@ -475,7 +475,12 @@ jobs:
             [View workflow run](${process.env.RUN_URL})`;
 
             const { owner, repo } = context.repo;
-            const issue_number = context.issue.number;
+            const issue_number = context.payload.pull_request?.number ?? context.issue.number;
+
+            if (!issue_number) {
+              core.info('No pull_request number found. Skipping PR comment upsert.');
+              return;
+            }
 
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner,
