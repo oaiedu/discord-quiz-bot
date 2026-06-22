@@ -362,19 +362,8 @@ jobs:
             fi
 
             if [ -f coverage.xml ]; then
-              coverage_percent=$(python - <<'PY'
-              import xml.etree.ElementTree as ET
-
-              root = ET.parse("coverage.xml").getroot()
-              line_rate = float(root.attrib.get("line-rate", 0.0))
-              print(f"{line_rate * 100:.2f}")
-              PY
-              )
-              if python - "$coverage_percent" <<'PY'
-              import sys
-              cov = float(sys.argv[1])
-              sys.exit(0 if cov >= 70.0 else 1)
-              PY
+              coverage_percent=$(python -c 'import xml.etree.ElementTree as ET; root = ET.parse("coverage.xml").getroot(); line_rate = float(root.attrib.get("line-rate", 0.0)); print(f"{line_rate * 100:.2f}")')
+              if python -c 'import sys; cov = float(sys.argv[1]); raise SystemExit(0 if cov >= 70.0 else 1)' "$coverage_percent"
               then
                 coverage_status="pass"
               else
