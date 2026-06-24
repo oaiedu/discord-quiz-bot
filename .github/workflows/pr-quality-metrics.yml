@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -34,7 +36,16 @@ jobs:
         run: |
           set +e
 
-          git ls-files '*.py' ':!:discord/**' ':!:venv/**' ':!:__pycache__/**' > python_files.txt
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_sha="${{ github.event.pull_request.base.sha }}"
+            head_sha="${{ github.event.pull_request.head.sha }}"
+            git diff --name-only --diff-filter=ACMR "$base_sha...$head_sha" \
+              | grep -E '\.py$' \
+              | grep -Ev '^(discord/|venv/|__pycache__/)' \
+              > python_files.txt || true
+          else
+            git ls-files '*.py' ':!:discord/**' ':!:venv/**' ':!:__pycache__/**' > python_files.txt
+          fi
 
           if [ ! -s python_files.txt ]; then
             echo "No Python files found."
